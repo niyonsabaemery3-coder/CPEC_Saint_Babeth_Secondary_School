@@ -19,7 +19,6 @@ const MENU: { key: SettingsSection; icon: string; title: string; desc: string; i
   { key: "gallery", icon: "fa-images", title: "Gallery", desc: "Swap photos & edit captions" },
   { key: "contact", icon: "fa-address-book", title: "Contact", desc: "Edit address, phone & office hours" },
   { key: "faq", icon: "fa-comment-dots", title: "Chat Questions (FAQ)", desc: "Edit the questions & answers in the chat widget" },
-  { key: "data", icon: "fa-database", title: "Data & Storage", desc: "How your data is saved, and reset options" },
 ];
 
 interface SettingsViewProps {
