@@ -1,0 +1,30 @@
+{
+  "name": "st-babeth-tss-api",
+  "private": true,
+  "version": "1.0.0",
+  "type": "commonjs",
+  "description": "MySQL-backed REST API for the CPEC Saint Babeth TSS website",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "db:init": "node src/scripts/initDb.js",
+    "db:seed": "node src/scripts/seed.js",
+    "db:migrate-classes": "node src/scripts/migrateSchoolClasses.js",
+    "db:migrate-registration": "node src/scripts/migrateRegistration.js",
+    "storage:cleanup": "node src/scripts/cleanupOrphanedFiles.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1117.0",
+    "@aws-sdk/s3-request-presigner": "^3.1117.0",
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.0.1",
+    "express-rate-limit": "^8.6.2",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.11.0"
+  }
+}

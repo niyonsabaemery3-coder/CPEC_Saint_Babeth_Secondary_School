@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /teacher
+Disallow: /student
+
+Sitemap: https://cpecstbabeth.rw/sitemap.xml
