@@ -57,7 +57,7 @@ const DEFAULT_TEACHERS: Teacher[] = [];
 const DEFAULT_FAQS: Faq[] = [];
 
 const DEFAULT_PAGE_BANNERS: PageBanners = {
-  about: { eyebrow: "About Our School", title: "Who We Are", subtitle: "Discipline, work and integrity guiding every student at CPEC Saint Babeth TSS.", bgImage: "" },
+  about: { eyebrow: "About Our School", title: "Who We Are", subtitle: "Discipline, work and integrity guiding every student at CPEC Saint Babeth TSS.", bgImage: `${import.meta.env.BASE_URL}images/brand/school-gate.jpeg` },
   academics: { eyebrow: "Academics", title: "What We Teach", subtitle: "A well-rounded lower-secondary curriculum paired with in-demand technology skills.", bgImage: "" },
   admissions: { eyebrow: "Admissions", title: "Apply to CPEC Saint Babeth TSS", subtitle: "Start your application online — it only takes a few minutes.", bgImage: "" },
   teachers: { eyebrow: "Our Team", title: "Meet Our Teachers", subtitle: "Dedicated educators guiding every student in and beyond the classroom.", bgImage: "" },
@@ -66,7 +66,7 @@ const DEFAULT_PAGE_BANNERS: PageBanners = {
 };
 
 const DEFAULT_SITE: SiteContent = {
-  heroImg: `${import.meta.env.BASE_URL}images/hero-styled.webp`,
+  heroImg: `${import.meta.env.BASE_URL}images/brand/students-meeting.jpeg`,
   heroMain: "CPEC Saint Babeth",
   heroAccent: "TSS",
   heroSub:
@@ -78,7 +78,7 @@ const DEFAULT_SITE: SiteContent = {
   feat3Title: "Discipline & Integrity",
   feat3Desc: "Building character, responsibility and respect in every student.",
 
-  aboutImg: `${import.meta.env.BASE_URL}images/demo-student.webp`,
+  aboutImg: `${import.meta.env.BASE_URL}images/brand/school-gate.jpeg`,
   aboutTitle: "Discipline, Work, Integrity — since day one",
   aboutPara1:
     "CPEC Saint Babeth TSS is based in Byumba, Rwanda, offering lower secondary education (S1–S3) alongside specialised technology training. Our mission is to nurture disciplined, skilled and principled young people ready for the modern world.",
@@ -96,15 +96,15 @@ const DEFAULT_SITE: SiteContent = {
     { title: "Senior 2 (S2)", desc: "Deeper subject exploration with continued focus on discipline, teamwork and academic performance." },
     { title: "Senior 3 (S3)", desc: "Consolidation year preparing students for national exams and future specialisation choices." },
   ],
-  stripTitle: "Technology & Media Track",
+  stripTitle: "Subjects taught across our programs",
   stripDesc: "Hands-on classes designed to give students real, practical digital skills alongside their core curriculum.",
 
   gallery: [
-    { img: `${import.meta.env.BASE_URL}images/gallery/school-gate.webp`, cap: "School Gate" },
+    { img: `${import.meta.env.BASE_URL}images/brand/students-meeting.jpeg`, cap: "Students gathered in school uniform" },
+    { img: `${import.meta.env.BASE_URL}images/brand/school-gate.jpeg`, cap: "Entrance to CPEC Saint Babeth Secondary School" },
     { img: `${import.meta.env.BASE_URL}images/gallery/football-team.webp`, cap: "Football Team" },
     { img: `${import.meta.env.BASE_URL}images/gallery/agriculture.webp`, cap: "Agriculture Club" },
     { img: `${import.meta.env.BASE_URL}images/gallery/readers.webp`, cap: "Reading Time" },
-    { img: `${import.meta.env.BASE_URL}images/gallery/head-teachers.webp`, cap: "Our Staff" },
   ],
 
   contactAddress: "C3F8+QM8, Byumba, Rwanda",

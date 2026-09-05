@@ -1,4 +1,4 @@
-import { Link, useOutletContext } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useSEO } from "../hooks/useSEO";
 import Hero from "../components/sections/Hero";
 import HomeEventsTeaser from "../components/sections/HomeEventsTeaser";
@@ -7,7 +7,6 @@ import Academics from "../components/sections/Academics";
 import Teachers from "../components/sections/Teachers";
 import Gallery from "../components/sections/Gallery";
 import AdmissionsCTA from "../components/sections/AdmissionsCTA";
-import type { LayoutContext } from "../components/layout/Layout";
 
 function ViewFullPage({ to, label }: { to: string; label: string }) {
   return (
@@ -20,7 +19,6 @@ function ViewFullPage({ to, label }: { to: string; label: string }) {
 }
 
 export default function HomePage() {
-  const { onOpenLogin } = useOutletContext<LayoutContext>();
   useSEO({
     title: "CPEC Saint Babeth TSS",
     description:

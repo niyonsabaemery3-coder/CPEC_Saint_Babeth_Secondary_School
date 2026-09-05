@@ -30,46 +30,55 @@ export default function Hero() {
           </div>
         </div>
         <div className="hero-media">
-          <img
-            src={site.heroImg}
-            alt="Students of CPEC Saint Babeth TSS"
-            loading="eager"
-            fetchPriority="high"
-            decoding="async"
-            width={900}
-            height={700}
-          />
+          <div className="glass-card p-4 sm:p-6 rounded-2xl">
+            <img
+              src={site.heroImg}
+              alt="Students of CPEC Saint Babeth TSS"
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              width={900}
+              height={700}
+            />
+          </div>
         </div>
       </div>
 
-      <div className="features">
-        <div className="feature">
-          <div className="icon">
-            <i className="fa-solid fa-graduation-cap" />
-          </div>
-          <div>
-            <h4>{site.feat1Title}</h4>
-            <p>{site.feat1Desc}</p>
-          </div>
-        </div>
-        <div className="feature">
-          <div className="icon">
-            <i className="fa-solid fa-laptop-code" />
-          </div>
-          <div>
-            <h4>{site.feat2Title}</h4>
-            <p>{site.feat2Desc}</p>
-          </div>
-        </div>
-        <div className="feature">
-          <div className="icon">
-            <i className="fa-solid fa-trophy" />
-          </div>
-          <div>
-            <h4>{site.feat3Title}</h4>
-            <p>{site.feat3Desc}</p>
-          </div>
-        </div>
+      <div className="features" aria-label="CPEC Saint Babeth school facts">
+        {[
+          {
+            icon: "fa-layer-group",
+            value: site.programs.length,
+            label: "Programs Offered",
+            to: "/academics",
+          },
+          {
+            icon: "fa-laptop-code",
+            value: 3,
+            label: "Technology Pathways",
+            to: "/academics",
+          },
+          {
+            icon: "fa-shield-heart",
+            value: site.aboutLi.length,
+            label: "School Commitments",
+            to: "/about",
+          },
+          {
+            icon: "fa-images",
+            value: site.gallery.length,
+            label: "Campus Highlights",
+            to: "/gallery",
+          },
+        ].map((stat) => (
+          <Link key={stat.label} to={stat.to} className="feature">
+            <span className="icon" aria-hidden="true">
+              <i className={`fa-solid ${stat.icon}`} />
+            </span>
+            <strong className="feature-value">{stat.value}</strong>
+            <h4>{stat.label}</h4>
+          </Link>
+        ))}
       </div>
     </section>
   );
