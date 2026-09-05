@@ -64,6 +64,7 @@ export default function GalleryPanel() {
     if (draft.length <= 1) return; // always keep at least one photo
     const photo = draft[index];
     if (photo.id) {
+      if (!confirm("Remove this photo? This cannot be undone.")) return;
       setRowStatus(index, { saving: true, error: null });
       try {
         await deleteGalleryPhoto(photo.id);

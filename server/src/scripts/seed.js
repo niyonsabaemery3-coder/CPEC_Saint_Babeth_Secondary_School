@@ -145,7 +145,7 @@ async function ensureSiteContent() {
        strip_title, strip_desc, contact_address, contact_phone, contact_hours)
      VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      "/images/hero-styled.png",
+      "/images/hero-styled.webp",
       "CPEC Saint Babeth",
       "TSS",
       "Located in Byumba, we prepare students in S1–S3 for national excellence while building strong foundations in Software Development, ICT and Multimedia Production.",
@@ -155,7 +155,7 @@ async function ensureSiteContent() {
       "Software Development, ICT and Multimedia Production taught from the foundation.",
       "Discipline & Integrity",
       "Building character, responsibility and respect in every student.",
-      "/images/demo-student.jpeg",
+      "/images/demo-student.webp",
       "Discipline, Work, Integrity — since day one",
       "CPEC Saint Babeth TSS is based in Byumba, Rwanda, offering lower secondary education (S1–S3) alongside specialised technology training. Our mission is to nurture disciplined, skilled and principled young people ready for the modern world.",
       "Guided by our motto — Discipline, Work, Integrity — we combine strong academic fundamentals with practical Software Development, ICT and Multimedia Production skills that open doors beyond the classroom.",
@@ -189,11 +189,11 @@ async function ensureSiteContent() {
   }
 
   const gallery = [
-    ["/images/gallery/school-gate.jpg", "School Gate"],
-    ["/images/gallery/football-team.jpg", "Football Team"],
-    ["/images/gallery/agriculture.jpg", "Agriculture Club"],
-    ["/images/gallery/readers.jpg", "Reading Time"],
-    ["/images/gallery/head-teachers.jpg", "Our Staff"],
+    ["/images/gallery/school-gate.webp", "School Gate"],
+    ["/images/gallery/football-team.webp", "Football Team"],
+    ["/images/gallery/agriculture.webp", "Agriculture Club"],
+    ["/images/gallery/readers.webp", "Reading Time"],
+    ["/images/gallery/head-teachers.webp", "Our Staff"],
   ];
   order = 0;
   for (const [imageUrl, caption] of gallery) {
@@ -236,16 +236,16 @@ async function ensureNewsItems() {
   const news = [
     ["2026-08-18", "Academics", "Term 3 timetable and exam schedule released",
       "The Term 3 class timetable and end-of-term exam schedule are now available to students and parents. Check the Resources page for your class copy.",
-      "/images/gallery/readers.jpg"],
+      "/images/gallery/readers.webp"],
     ["2026-08-05", "Achievement", "Software Development class wins district ICT competition",
       "Our Level 3 Software Development students took first place at the district ICT innovation competition, presenting a mobile app to help local farmers track produce prices.",
-      "/images/gallery/head-teachers.jpg"],
+      "/images/gallery/head-teachers.webp"],
     ["2026-07-22", "Admissions", "2027 admissions open for Senior 1 and Senior 4",
       "Applications for the next academic year are now open. Parents and prospective students can apply online or visit the school office in Byumba.",
-      "/images/gallery/school-gate.jpg"],
+      "/images/gallery/school-gate.webp"],
     ["2026-07-10", "Community", "Parents' day: strong turnout for Term 2 report discussions",
       "Parents and guardians met with class teachers to review Term 2 progress reports and discuss support plans ahead of Term 3.",
-      "/images/gallery/football-team.jpg"],
+      "/images/gallery/football-team.webp"],
   ];
   let order = news.length;
   for (const [date, category, title, excerpt, image] of news) {

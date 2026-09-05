@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { Link } from "react-router-dom";
-import { useFadeUp } from "../../hooks/useGsapAnimations";
+import { useFadeUp } from "../../hooks/useScrollAnimations";
 
 // Short homepage teaser for Admissions. The full multi-step application
 // wizard lives on its own page (/admissions) — see AdmissionsPage.tsx,

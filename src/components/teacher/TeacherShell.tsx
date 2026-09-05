@@ -1,5 +1,5 @@
 import { useState } from "react";
-import logo from "../../assets/logo-navbar.png";
+import logo from "../../assets/logo-navbar.webp";
 import { useApp } from "../../context/AppContext";
 import type { TeacherView } from "../../types";
 import MyResourcesView from "./views/MyResourcesView";

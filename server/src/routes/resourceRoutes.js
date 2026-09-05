@@ -93,6 +93,51 @@ router.post("/", requireTeacher, async (req, res) => {
   res.status(201).json(toPublic(req, rows[0], true));
 });
 
+// Teacher (own resource) or Admin (any resource) can edit metadata, and
+// optionally replace the attached file/link. Never touches any other row.
+router.put("/:id", requireAdminOrTeacher, async (req, res, next) => {
+  try {
+    const [rows] = await pool.query("SELECT * FROM resources WHERE id = ?", [req.params.id]);
+    const resource = rows[0];
+    if (!resource) return res.status(404).json({ error: "Resource not found." });
+
+    if (req.auth.role === "teacher" && resource.uploader_id !== req.auth.id) {
+      return res.status(403).json({ error: "You can only edit your own resources." });
+    }
+
+    const { title, subject, schoolClass, type, fileData, fileName, link } = req.body || {};
+    if (!title?.trim() || !subject?.trim() || !schoolClass || !type) {
+      return res.status(400).json({ error: "Title, subject, class and type are required." });
+    }
+    if (!SCHOOL_CLASS_VALUES.includes(schoolClass)) {
+      return res.status(400).json({ error: "Please choose a valid class." });
+    }
+    if (!fileData && !resource.file_url && !link?.trim()) {
+      return res.status(400).json({ error: "Attach a file or provide a link." });
+    }
+
+    // Only touch the file if a new one was uploaded — otherwise keep the
+    // existing file_url/file_name exactly as they were.
+    let fileUrl = resource.file_url;
+    let finalFileName = resource.file_name;
+    if (fileData) {
+      fileUrl = await saveBase64File(fileData, "resources", fileName);
+      finalFileName = fileName || null;
+      if (resource.file_url) await deleteUploadedFile(resource.file_url).catch(() => {});
+    }
+
+    await pool.query(
+      "UPDATE resources SET title = ?, subject = ?, school_class = ?, type = ?, file_url = ?, file_name = ?, link_url = ? WHERE id = ?",
+      [title.trim(), subject.trim(), schoolClass, type, fileUrl, fileUrl ? finalFileName : null, link?.trim() || null, req.params.id]
+    );
+
+    const [updated] = await pool.query(`${BASE_QUERY} WHERE r.id = ?`, [req.params.id]);
+    res.json(toPublic(req, updated[0], true));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Teacher (own resource) or Admin (any resource) can delete.
 router.delete("/:id", requireAdminOrTeacher, async (req, res) => {
   const [rows] = await pool.query("SELECT * FROM resources WHERE id = ?", [req.params.id]);

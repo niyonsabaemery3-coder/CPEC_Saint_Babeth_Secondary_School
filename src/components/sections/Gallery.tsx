@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../context/AppContext";
-import { useFadeUp } from "../../hooks/useGsapAnimations";
+import { useFadeUp } from "../../hooks/useScrollAnimations";
 
 // One page = 1 large "featured" tile + 4 regular tiles, matching the bento
 // grid's 4-column x 2-row layout. Once there are more photos than this, the
@@ -90,7 +90,7 @@ export default function Gallery({ teaser = false }: GalleryProps) {
                 if (e.key === "Enter" || e.key === " ") openLightbox(i);
               }}
             >
-              <img src={g.img} alt={g.cap} />
+              <img src={g.img} alt={g.cap} loading="lazy" decoding="async" width={600} height={450} />
               <div className="cap">{g.cap}</div>
             </div>
           ))}
@@ -136,7 +136,7 @@ export default function Gallery({ teaser = false }: GalleryProps) {
           </button>
 
           <div className="gal-lb-content" onClick={(e) => e.stopPropagation()}>
-            <img src={activePhoto.img} alt={activePhoto.cap} />
+            <img src={activePhoto.img} alt={activePhoto.cap} loading="lazy" decoding="async" />
             <div className="gal-lb-meta">
               <span className="gal-lb-cap">{activePhoto.cap}</span>
               <span className="gal-lb-count">

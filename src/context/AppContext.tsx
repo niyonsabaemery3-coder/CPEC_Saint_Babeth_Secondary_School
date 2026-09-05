@@ -66,7 +66,7 @@ const DEFAULT_PAGE_BANNERS: PageBanners = {
 };
 
 const DEFAULT_SITE: SiteContent = {
-  heroImg: `${import.meta.env.BASE_URL}images/hero-styled.png`,
+  heroImg: `${import.meta.env.BASE_URL}images/hero-styled.webp`,
   heroMain: "CPEC Saint Babeth",
   heroAccent: "TSS",
   heroSub:
@@ -78,7 +78,7 @@ const DEFAULT_SITE: SiteContent = {
   feat3Title: "Discipline & Integrity",
   feat3Desc: "Building character, responsibility and respect in every student.",
 
-  aboutImg: `${import.meta.env.BASE_URL}images/demo-student.jpeg`,
+  aboutImg: `${import.meta.env.BASE_URL}images/demo-student.webp`,
   aboutTitle: "Discipline, Work, Integrity — since day one",
   aboutPara1:
     "CPEC Saint Babeth TSS is based in Byumba, Rwanda, offering lower secondary education (S1–S3) alongside specialised technology training. Our mission is to nurture disciplined, skilled and principled young people ready for the modern world.",
@@ -100,11 +100,11 @@ const DEFAULT_SITE: SiteContent = {
   stripDesc: "Hands-on classes designed to give students real, practical digital skills alongside their core curriculum.",
 
   gallery: [
-    { img: `${import.meta.env.BASE_URL}images/gallery/school-gate.jpg`, cap: "School Gate" },
-    { img: `${import.meta.env.BASE_URL}images/gallery/football-team.jpg`, cap: "Football Team" },
-    { img: `${import.meta.env.BASE_URL}images/gallery/agriculture.jpg`, cap: "Agriculture Club" },
-    { img: `${import.meta.env.BASE_URL}images/gallery/readers.jpg`, cap: "Reading Time" },
-    { img: `${import.meta.env.BASE_URL}images/gallery/head-teachers.jpg`, cap: "Our Staff" },
+    { img: `${import.meta.env.BASE_URL}images/gallery/school-gate.webp`, cap: "School Gate" },
+    { img: `${import.meta.env.BASE_URL}images/gallery/football-team.webp`, cap: "Football Team" },
+    { img: `${import.meta.env.BASE_URL}images/gallery/agriculture.webp`, cap: "Agriculture Club" },
+    { img: `${import.meta.env.BASE_URL}images/gallery/readers.webp`, cap: "Reading Time" },
+    { img: `${import.meta.env.BASE_URL}images/gallery/head-teachers.webp`, cap: "Our Staff" },
   ],
 
   contactAddress: "C3F8+QM8, Byumba, Rwanda",
@@ -130,6 +130,7 @@ interface AppContextValue {
   // teachers (public directory shown on the Teachers section)
   teachers: Teacher[];
   addTeacher: (t: Omit<Teacher, "id">) => Promise<void>;
+  updateTeacher: (index: number, t: Omit<Teacher, "id">) => Promise<void>;
   deleteTeacher: (index: number) => Promise<void>;
 
   // teacher accounts (admin-managed, plus optional self-registration — see registrationSettings)
@@ -162,6 +163,10 @@ interface AppContextValue {
   // resources (Notes / Presentations / Past Papers)
   resources: Resource[];
   addResource: (r: Omit<Resource, "id" | "createdAt">) => Promise<void>;
+  updateResource: (
+    id: number,
+    r: { title: string; subject: string; schoolClass: Resource["schoolClass"]; type: Resource["type"]; fileName: string | null; fileData: string | null; link: string | null }
+  ) => Promise<void>;
   deleteResource: (id: number) => Promise<void>;
 
   // student reports (one report file per student, uploaded by an admin)
@@ -427,6 +432,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!target) return;
     await api.delete(`/api/teachers/${target.id}`, "admin");
     setTeachers((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateTeacher = async (index: number, updates: Omit<Teacher, "id">) => {
+    const target = teachers[index];
+    if (!target) return;
+    const saved = await api.put<Teacher>(`/api/teachers/${target.id}`, updates, "admin");
+    setTeachers((prev) => prev.map((t, i) => (i === index ? saved : t)));
   };
 
   // -------------------------------------------------------------- APPLICATIONS --
@@ -758,6 +770,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setResources((prev) => prev.filter((r) => r.id !== id));
   };
 
+  const updateResource = async (
+    id: number,
+    r: { title: string; subject: string; schoolClass: Resource["schoolClass"]; type: Resource["type"]; fileName: string | null; fileData: string | null; link: string | null }
+  ) => {
+    const saved = await api.put<Resource>(`/api/resources/${id}`, r, adminLoggedIn ? "admin" : "teacher");
+    setResources((prev) => prev.map((res) => (res.id === id ? saved : res)));
+  };
+
   // ---------------------------------------------------------------- STUDENT REPORTS --
   const fetchStudentReports = async () => {
     try {
@@ -831,6 +851,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toggleTheme,
     teachers,
     addTeacher,
+    updateTeacher,
     deleteTeacher,
     teacherAccounts,
     createTeacherAccount,
@@ -857,6 +878,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateStudentPassword,
     resources,
     addResource,
+    updateResource,
     deleteResource,
     studentReports,
     fetchStudentReports,

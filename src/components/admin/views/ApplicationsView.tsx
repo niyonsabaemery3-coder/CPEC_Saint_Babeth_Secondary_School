@@ -51,7 +51,12 @@ export default function ApplicationsView() {
                     )}
                   </td>
                   <td>
-                    <button className="a-del-btn" onClick={() => deleteApplication(a.id)}>
+                    <button
+                      className="a-del-btn"
+                      onClick={() => {
+                        if (confirm(`Delete ${a.name}'s application? This cannot be undone.`)) deleteApplication(a.id);
+                      }}
+                    >
                       <i className="fa-solid fa-trash" />
                     </button>
                   </td>

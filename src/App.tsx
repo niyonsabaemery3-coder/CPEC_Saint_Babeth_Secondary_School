@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import Layout from "./components/layout/Layout";
 import ScrollToTop from "./components/layout/ScrollToTop";
@@ -13,8 +13,6 @@ const AcademicsPage = lazy(() => import("./pages/AcademicsPage"));
 const AdmissionsPage = lazy(() => import("./pages/AdmissionsPage"));
 const TeachersPage = lazy(() => import("./pages/TeachersPage"));
 const StudentsPage = lazy(() => import("./pages/StudentsPage"));
-const NewsPage = lazy(() => import("./pages/NewsPage"));
-const EventsPage = lazy(() => import("./pages/EventsPage"));
 const EventsNewsPage = lazy(() => import("./pages/EventsNewsPage"));
 const GalleryPage = lazy(() => import("./pages/GalleryPage"));
 const ResourcesPage = lazy(() => import("./pages/ResourcesPage"));
@@ -34,8 +32,12 @@ export default function App() {
             <Route path="admissions" element={<AdmissionsPage />} />
             <Route path="teachers" element={<TeachersPage />} />
             <Route path="students" element={<StudentsPage />} />
-            <Route path="news" element={<NewsPage />} />
-            <Route path="events" element={<EventsPage />} />
+            {/* /news and /events were static, hard-coded pages that duplicated
+                the dynamic, database-driven Events & News system below. They
+                are kept as redirects (not removed outright) so any old
+                bookmarks or external links still land somewhere valid. */}
+            <Route path="news" element={<Navigate to="/events-news" replace />} />
+            <Route path="events" element={<Navigate to="/events-news" replace />} />
             <Route path="events-news" element={<EventsNewsPage />} />
             <Route path="gallery" element={<GalleryPage />} />
             <Route path="resources" element={<ResourcesPage />} />

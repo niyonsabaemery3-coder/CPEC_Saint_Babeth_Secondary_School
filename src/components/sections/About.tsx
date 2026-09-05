@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { useApp } from "../../context/AppContext";
-import { useFadeUp } from "../../hooks/useGsapAnimations";
+import { useFadeUp } from "../../hooks/useScrollAnimations";
 
 export default function About() {
   const { site } = useApp();
@@ -11,7 +11,7 @@ export default function About() {
     <section id="about" className="card" ref={ref}>
       <div className="about-grid">
         <div className="about-img">
-          <img src={site.aboutImg} alt="A student at CPEC Saint Babeth" loading="lazy" />
+          <img src={site.aboutImg} alt="A student at CPEC Saint Babeth" loading="lazy" decoding="async" />
         </div>
         <div className="about-copy">
           <div className="eyebrow">

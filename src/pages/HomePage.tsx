@@ -5,7 +5,6 @@ import HomeEventsTeaser from "../components/sections/HomeEventsTeaser";
 import About from "../components/sections/About";
 import Academics from "../components/sections/Academics";
 import Teachers from "../components/sections/Teachers";
-import Resources from "../components/sections/Resources";
 import Gallery from "../components/sections/Gallery";
 import AdmissionsCTA from "../components/sections/AdmissionsCTA";
 import type { LayoutContext } from "../components/layout/Layout";
@@ -34,13 +33,11 @@ export default function HomePage() {
       <Hero />
       <About />
       <ViewFullPage to="/about" label="More About Our School" />
-      <Academics />
+      <Academics teaser />
       <ViewFullPage to="/academics" label="View All Academic Programs" />
       <HomeEventsTeaser />
-      <Teachers />
+      <Teachers teaser />
       <ViewFullPage to="/teachers" label="Meet the Full Team" />
-      <Resources onRequireLogin={onOpenLogin} teaser />
-      <ViewFullPage to="/resources" label="Browse All Resources" />
       <Gallery teaser />
       <ViewFullPage to="/gallery" label="View Full Gallery" />
       <AdmissionsCTA />

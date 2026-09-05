@@ -169,6 +169,28 @@ app.use("/api/news", newsRoutes);
 
 app.use("/api/events", eventRoutes);
 
+// Client-side routes the SPA actually handles (kept in sync with src/App.tsx).
+// A request for anything else is a genuine 404 — even though we still need
+// to serve the SPA shell so React Router can render the NotFoundPage, we
+// return a real 404 status instead of silently answering 200 for every
+// unmatched path. Plain "200 for everything" is the classic SPA "soft 404"
+// that confuses search engines; this keeps crawlable pages crawlable while
+// giving unknown URLs a correct status code.
+const KNOWN_SPA_ROUTES = new Set([
+  "/",
+  "/about",
+  "/academics",
+  "/admissions",
+  "/teachers",
+  "/students",
+  "/news",
+  "/events",
+  "/events-news",
+  "/gallery",
+  "/resources",
+  "/contact",
+]);
+
 app.use((req, res) => {
   if (req.path.startsWith("/api")) {
     return res.status(404).json({
@@ -176,7 +198,8 @@ app.use((req, res) => {
     });
   }
 
-  res.sendFile(path.join(distDir, "index.html"));
+  const status = KNOWN_SPA_ROUTES.has(req.path) ? 200 : 404;
+  res.status(status).sendFile(path.join(distDir, "index.html"));
 });
 
 app.use((err, _req, res, _next) => {

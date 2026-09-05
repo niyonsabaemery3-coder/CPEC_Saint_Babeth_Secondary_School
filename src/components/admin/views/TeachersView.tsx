@@ -179,7 +179,12 @@ export default function TeachersView() {
                     <td>{r.uploaderName}</td>
                     <td>{r.createdAt}</td>
                     <td>
-                      <button className="a-del-btn" onClick={() => deleteResource(r.id)}>
+                      <button
+                        className="a-del-btn"
+                        onClick={() => {
+                          if (confirm(`Delete "${r.title}"? This cannot be undone.`)) deleteResource(r.id);
+                        }}
+                      >
                         <i className="fa-solid fa-trash" />
                       </button>
                     </td>

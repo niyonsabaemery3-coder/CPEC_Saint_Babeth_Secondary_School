@@ -1,4 +1,4 @@
-import logo from "../../assets/logo-navbar.png";
+import logo from "../../assets/logo-navbar.webp";
 import { useApp } from "../../context/AppContext";
 import type { AdminView } from "../../types";
 import DashboardView from "./views/DashboardView";

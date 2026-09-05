@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import logo from "../../assets/logo-navbar.png";
+import logo from "../../assets/logo-navbar.webp";
 import { useApp } from "../../context/AppContext";
 
 interface FooterProps {
@@ -25,8 +25,7 @@ export default function Footer({ onOpenLogin }: FooterProps) {
           <ul>
             <li><Link to="/">Home</Link></li>
             <li><Link to="/about">About</Link></li>
-            <li><Link to="/news">News</Link></li>
-            <li><Link to="/events">Events</Link></li>
+            <li><Link to="/events-news">Events &amp; News</Link></li>
             <li><Link to="/gallery">Gallery</Link></li>
           </ul>
         </div>
@@ -61,7 +60,7 @@ export default function Footer({ onOpenLogin }: FooterProps) {
           <ul>
             <li>{site.contactAddress}</li>
             <li>{site.contactPhone}</li>
-            <li>Mon – Fri, 7:00 AM – 5:00 PM</li>
+            <li>{site.contactHours}</li>
             <li className="foot-social">
               <a href={site.contactPhone ? `https://wa.me/${site.contactPhone.replace(/[^\d]/g, "")}` : "#"} aria-label="WhatsApp" target="_blank" rel="noreferrer">
                 <i className="fa-brands fa-whatsapp" />

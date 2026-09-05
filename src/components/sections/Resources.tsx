@@ -3,7 +3,7 @@ import { useApp } from "../../context/AppContext";
 import type { ResourceType, SchoolClass } from "../../types";
 import ClassOptions from "../common/ClassOptions";
 import Pagination from "../common/Pagination";
-import { useFadeUp } from "../../hooks/useGsapAnimations";
+import { useFadeUp } from "../../hooks/useScrollAnimations";
 
 const TYPE_LABEL: Record<ResourceType, string> = {
   notes: "Notes",

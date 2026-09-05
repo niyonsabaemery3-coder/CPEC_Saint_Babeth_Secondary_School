@@ -2,16 +2,24 @@ import { useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useApp } from "../../context/AppContext";
 import { initials } from "../../utils/format";
-import { useFadeUp } from "../../hooks/useGsapAnimations";
+import { useFadeUp } from "../../hooks/useScrollAnimations";
 
-export default function Teachers() {
+interface TeachersProps {
+  // Homepage preview mode: shows only a handful of teachers with no
+  // "View More" expansion — the full team lives on the dedicated /teachers
+  // page (TeachersPage.tsx renders this same component with no prop).
+  teaser?: boolean;
+}
+
+export default function Teachers({ teaser = false }: TeachersProps) {
   const { teachers } = useApp();
   const { pathname } = useLocation();
   const [expanded, setExpanded] = useState(false);
   const ref = useRef<HTMLElement>(null);
   useFadeUp(ref);
 
-  const visibleCount = expanded ? teachers.length : 4;
+  const defaultCount = teaser ? 3 : 4;
+  const visibleCount = expanded ? teachers.length : defaultCount;
 
   return (
     <section id="teachers" className="card" ref={ref}>

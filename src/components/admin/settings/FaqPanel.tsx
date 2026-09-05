@@ -36,6 +36,7 @@ export default function FaqPanel() {
   };
 
   const handleDelete = (index: number) => {
+    if (!confirm("Delete this question? This cannot be undone.")) return;
     deleteFaq(index);
     setDraft((d) => d.filter((_, i) => i !== index));
   };

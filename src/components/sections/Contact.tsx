@@ -3,7 +3,7 @@ import { useApp } from "../../context/AppContext";
 import FieldError from "../common/FieldError";
 import GoogleMapCard from "../common/GoogleMapCard";
 import { validateMinLength, validateEmail, validateRwandaPhone, isValid } from "../../utils/validation";
-import { useFadeUp } from "../../hooks/useGsapAnimations";
+import { useFadeUp } from "../../hooks/useScrollAnimations";
 
 export default function Contact() {
   const { site } = useApp();

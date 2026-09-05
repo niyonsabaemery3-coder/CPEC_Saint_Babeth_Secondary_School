@@ -1,6 +1,7 @@
 import { useRef } from "react";
+import { Link } from "react-router-dom";
 import { useApp } from "../../context/AppContext";
-import { useStaggerText } from "../../hooks/useGsapAnimations";
+import { useStaggerText } from "../../hooks/useScrollAnimations";
 
 export default function Hero() {
   const { site } = useApp();
@@ -20,16 +21,24 @@ export default function Hero() {
           </h1>
           <p className="sub">{site.heroSub}</p>
           <div className="cta-row">
-            <a href="#apply" className="btn-primary">
+            <Link to="/admissions" className="btn-primary">
               <i className="fa-solid fa-pen-to-square" /> Apply Now
-            </a>
-            <a href="#contact" className="btn-outline">
+            </Link>
+            <Link to="/contact" className="btn-outline">
               Contact Us
-            </a>
+            </Link>
           </div>
         </div>
         <div className="hero-media">
-          <img src={site.heroImg} alt="Students of CPEC Saint Babeth TSS" loading="eager" />
+          <img
+            src={site.heroImg}
+            alt="Students of CPEC Saint Babeth TSS"
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            width={900}
+            height={700}
+          />
         </div>
       </div>
 

@@ -2,7 +2,7 @@ const express = require("express");
 const pool = require("../db");
 const { requireAdmin } = require("../middleware/auth");
 const { saveBase64File, deleteUploadedFile } = require("../utils/uploads");
-const { toAbsoluteUploadUrl } = require("../utils/publicUrl");
+const { toAbsoluteUploadUrl, toRelativeUploadPath } = require("../utils/publicUrl");
 
 const router = express.Router();
 
@@ -38,6 +38,36 @@ router.post("/", requireAdmin, async (req, res) => {
 
   const [rows] = await pool.query("SELECT * FROM teachers WHERE id = ?", [insertId]);
   res.status(201).json(toPublic(req, rows[0]));
+});
+
+// Admin: update one existing teacher in the public directory. Body:
+// { name, subject, quote, photo, color }. Never touches any other row —
+// only this teacher's own record is affected.
+router.put("/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const [[existing]] = await pool.query("SELECT * FROM teachers WHERE id = ?", [id]);
+    if (!existing) return res.status(404).json({ error: "Teacher not found." });
+
+    const { name, subject, quote, photo, color } = req.body || {};
+    if (!name?.trim() || !subject?.trim()) {
+      return res.status(400).json({ error: "Name and subject are required." });
+    }
+
+    const photoUrl = photo?.startsWith("data:") ? await saveBase64File(photo, "images") : toRelativeUploadPath(photo);
+
+    await pool.query(
+      "UPDATE teachers SET name = ?, subject = ?, quote = ?, photo_url = ?, color = ? WHERE id = ?",
+      [name.trim(), subject.trim(), quote?.trim() || "Passionate about helping students grow.", photoUrl, color || existing.color, id]
+    );
+
+    if (photoUrl !== existing.photo_url && existing.photo_url) await deleteUploadedFile(existing.photo_url).catch(() => {});
+
+    const [rows] = await pool.query("SELECT * FROM teachers WHERE id = ?", [id]);
+    res.json(toPublic(req, rows[0]));
+  } catch (err) {
+    next(err);
+  }
 });
 
 // Admin: remove a teacher from the public directory.

@@ -1,6 +1,6 @@
 import { useState, type MouseEvent } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import logo from "../../assets/logo-navbar.png";
+import logo from "../../assets/logo-navbar.webp";
 import { useApp } from "../../context/AppContext";
 
 type NavChild = { to: string; label: string };

@@ -92,7 +92,7 @@ a MySQL database attached — GitHub Pages only hosts the static frontend.
 
 ```
 src/                            (frontend)
-  assets/logo.png               school logo (favicon + navbar/footer/admin sidebar)
+  assets/logo-navbar.webp        navbar/footer/admin/teacher/student sidebar logo (public/logo.png is the separate favicon + Open Graph image)
   lib/api.ts                    fetch wrapper for the backend API (base URL, auth tokens, error handling)
   types/                        shared TypeScript types (Teacher, Resource, TeacherAccount, SiteContent...)
   context/AppContext.tsx        loads data from the API on mount and exposes it + mutator functions

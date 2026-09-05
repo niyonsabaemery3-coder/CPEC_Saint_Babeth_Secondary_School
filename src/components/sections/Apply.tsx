@@ -4,7 +4,7 @@ import type { StudentApplication } from "../../types";
 import { SCHOOL_CLASSES } from "../../constants/academics";
 import FieldError from "../common/FieldError";
 import { required, validateMinLength, validateRwandaPhone, validateOptionalRwandaPhone, isValid } from "../../utils/validation";
-import { useFadeUp } from "../../hooks/useGsapAnimations";
+import { useFadeUp } from "../../hooks/useScrollAnimations";
 
 const WIZ_LABELS = ["Student", "Track", "School", "Parent", "Review"];
 const WIZ_TOTAL = WIZ_LABELS.length;
