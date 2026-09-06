@@ -283,7 +283,68 @@ async function runProgramSectionsMigration() {
   console.log("✔ Program section labels are ready.");
 }
 
+async function runGalleryMigration() {
+  // Adds the `category` column to gallery_items for databases created before
+  // the gallery category feature was added.
+  const [[col]] = await db.query(
+    "SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'gallery_items' AND COLUMN_NAME = 'category'"
+  );
+  if (Number(col?.cnt) === 0) {
+    console.log("🔧 Adding gallery category support...");
+    await db.query("ALTER TABLE gallery_items ADD COLUMN category VARCHAR(100) NOT NULL DEFAULT 'General' AFTER caption");
+    console.log("✔ Gallery category column added.");
+  }
+}
+
+async function runHeroMigration() {
+  // Adds the `hero_images` column to site_content for databases created before
+  // the multi-image hero slideshow feature was added.
+  const [[col]] = await db.query(
+    "SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'site_content' AND COLUMN_NAME = 'hero_images'"
+  );
+  if (Number(col?.cnt) === 0) {
+    console.log("🔧 Adding hero slideshow support...");
+    await db.query("ALTER TABLE site_content ADD COLUMN hero_images LONGTEXT AFTER hero_img");
+    // Seed hero_images from the existing single hero_img so the slideshow
+    // shows something immediately rather than being empty.
+    const [[site]] = await db.query("SELECT hero_img FROM site_content WHERE id = 1");
+    if (site?.hero_img) {
+      await db.query("UPDATE site_content SET hero_images = ? WHERE id = 1", [JSON.stringify([site.hero_img])]);
+    }
+    console.log("✔ Hero slideshow column added.");
+  }
+}
+
+async function runApplicationTemplatesMigration() {
+  // Creates the application_feedback_templates table and seeds the default
+  // messages for databases created before this feature was added.
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS application_feedback_templates (
+      id                 INT PRIMARY KEY DEFAULT 1,
+      pending_message    TEXT NOT NULL,
+      approved_message   TEXT NOT NULL,
+      rejected_message   TEXT NOT NULL,
+      updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      CONSTRAINT chk_application_feedback_templates_singleton CHECK (id = 1)
+    ) ENGINE=InnoDB
+  `);
+  // Insert the default row only if it doesn't exist yet.
+  await db.query(
+    `INSERT INTO application_feedback_templates (id, pending_message, approved_message, rejected_message)
+     SELECT 1, ?, ?, ? FROM DUAL
+     WHERE NOT EXISTS (SELECT 1 FROM application_feedback_templates WHERE id = 1)`,
+    [
+      "Your application has been received and is waiting for review.",
+      "Congratulations. Your application has been approved. Please contact the school for the next steps.",
+      "Thank you for applying. Unfortunately, we cannot offer a place at this time because available places are full.",
+    ]
+  );
+}
+
 async function runMigrations() {
+  await runGalleryMigration();
+  await runHeroMigration();
+  await runApplicationTemplatesMigration();
   await runNewsEventsMigration();
   await runProgramSectionsMigration();
 

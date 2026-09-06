@@ -94,7 +94,7 @@ export default function Navbar({ onOpenLogin }: NavbarProps) {
             </div>
           ) : l.to ? (
             <NavLink key={l.to} to={l.to} end={l.end} className={({ isActive }) => (isActive ? "active" : "")}>
-              {l.icon && <i className={`fa-solid ${l.icon} nav-link-icon`} />}
+              
               {l.label}
               {l.isNew && <span className="nav-new-badge">NEW</span>}
             </NavLink>
