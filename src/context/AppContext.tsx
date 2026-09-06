@@ -85,6 +85,8 @@ const DEFAULT_SITE: SiteContent = {
     "CPEC Saint Babeth TSS is based in Byumba, Rwanda, offering lower secondary education (S1–S3) alongside specialised technology training. Our mission is to nurture disciplined, skilled and principled young people ready for the modern world.",
   aboutPara2:
     "Guided by our motto — Discipline, Work, Integrity — we combine strong academic fundamentals with practical Software Development, ICT and Multimedia Production skills that open doors beyond the classroom.",
+  aboutHistory:
+    "CPEC Saint Babeth Technical Secondary School was founded in Byumba, Rwanda with a clear purpose: to give young people a solid secondary education rooted in discipline, practical skills, and personal integrity. Since opening our doors we have grown from a small community school into a recognised institution offering Ordinary Level education (S1–S3) alongside specialised tracks in Software Development, ICT, and Multimedia Production. Every year we welcome new students from across the Northern Province, equipping them with the knowledge and character to succeed in national exams and beyond.",
   mission:
     "To provide a nurturing and disciplined learning environment where students grow academically, technically and personally through excellence in teaching, mentorship and character development.",
   vision:
@@ -173,7 +175,7 @@ interface AppContextValue {
 
   // resources (Notes / Presentations / Past Papers)
   resources: Resource[];
-  addResource: (r: Omit<Resource, "id" | "createdAt">) => Promise<void>;
+  addResource: (r: Omit<Resource, "id" | "createdAt">) => Promise<{ ok: boolean; message: string }>;
   updateResource: (
     id: number,
     r: { title: string; subject: string; schoolClass: Resource["schoolClass"]; type: Resource["type"]; fileName: string | null; fileData: string | null; link: string | null }
@@ -801,9 +803,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // ---------------------------------------------------------------------- RESOURCES --
-  const addResource = async (r: Omit<Resource, "id" | "createdAt">) => {
-    const created = await api.post<Resource>("/api/resources", r, "teacher");
-    setResources((prev) => [created, ...prev]);
+  const addResource = async (r: Omit<Resource, "id" | "createdAt">): Promise<{ ok: boolean; message: string }> => {
+    try {
+      const created = await api.post<Resource>("/api/resources", r, "teacher");
+      setResources((prev) => [created, ...prev]);
+      return { ok: true, message: "Resource published successfully." };
+    } catch (e) {
+      return { ok: false, message: e instanceof ApiError ? e.message : "Failed to save resource. Please try again." };
+    }
   };
 
   const deleteResource = async (id: number) => {

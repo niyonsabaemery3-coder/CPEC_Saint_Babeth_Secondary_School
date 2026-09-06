@@ -151,7 +151,7 @@ export default function Resources({ onRequireLogin, teaser = false }: ResourcesP
               </div>
               <div className="rc-title">{r.title}</div>
               <div className="rc-meta">
-                <span className="rc-chip">{r.schoolClass}</span>
+                <span className="rc-chip rc-chip-class"><i className="fa-solid fa-school" style={{marginRight:4}} />{r.schoolClass}</span>
                 <span className="rc-chip">{r.subject}</span>
                 <span className="rc-chip">{TYPE_LABEL[r.type]}</span>
               </div>

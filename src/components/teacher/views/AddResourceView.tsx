@@ -31,6 +31,8 @@ export default function AddResourceView({ onDone }: AddResourceViewProps) {
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileData, setFileData] = useState<string | null>(null);
   const [errors, setErrors] = useState<{ title?: string; subject?: string; attachment?: string; file?: string }>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const subjectSuggestions = useMemo(() => {
@@ -50,6 +52,7 @@ export default function AddResourceView({ onDone }: AddResourceViewProps) {
     setFileName(null);
     setFileData(null);
     setErrors({});
+    setSaveError(null);
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -71,7 +74,7 @@ export default function AddResourceView({ onDone }: AddResourceViewProps) {
     reader.readAsDataURL(file);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!currentTeacher) return;
     const trimmedTitle = title.trim();
     const trimmedSubject = subject.trim();
@@ -83,7 +86,9 @@ export default function AddResourceView({ onDone }: AddResourceViewProps) {
     setErrors(nextErrors);
     if (nextErrors.title || nextErrors.subject || nextErrors.attachment) return;
 
-    addResource({
+    setSaveError(null);
+    setSaving(true);
+    const result = await addResource({
       title: trimmedTitle,
       subject: trimmedSubject,
       schoolClass,
@@ -94,6 +99,12 @@ export default function AddResourceView({ onDone }: AddResourceViewProps) {
       uploaderId: currentTeacher.id,
       uploaderName: currentTeacher.fullName,
     });
+    setSaving(false);
+
+    if (!result.ok) {
+      setSaveError(result.message);
+      return;
+    }
     resetForm();
     onDone();
   };
@@ -113,7 +124,7 @@ export default function AddResourceView({ onDone }: AddResourceViewProps) {
           </div>
           <div className="rc-title">{title.trim() || "Resource title goes here"}</div>
           <div className="rc-meta">
-            <span className="rc-chip">{schoolClass}</span>
+            <span className="rc-chip rc-chip-class"><i className="fa-solid fa-school" style={{marginRight:4}} />{schoolClass}</span>
             <span className="rc-chip">{subject.trim() || "Subject"}</span>
             <span className="rc-chip">{TYPE_LABEL[type]}</span>
           </div>
@@ -139,15 +150,10 @@ export default function AddResourceView({ onDone }: AddResourceViewProps) {
           />
           <FieldError message={errors.subject} />
         </div>
-        <datalist id="subject-suggestions">
-          {subjectSuggestions.map((s) => (
-            <option key={s} value={s} />
-          ))}
-        </datalist>
-        <select value={schoolClass} onChange={(e) => setSchoolClass(e.target.value as SchoolClass)}>
+        <select value={schoolClass} onChange={(e) => setSchoolClass(e.target.value as SchoolClass)} aria-label="Class">
           <ClassOptions />
         </select>
-        <select value={type} onChange={(e) => setType(e.target.value as ResourceType)}>
+        <select value={type} onChange={(e) => setType(e.target.value as ResourceType)} aria-label="Resource type">
           <option value="notes">Notes</option>
           <option value="presentation">Presentation</option>
           <option value="pastpaper">Past Paper</option>
@@ -164,13 +170,23 @@ export default function AddResourceView({ onDone }: AddResourceViewProps) {
           <FieldError message={errors.file} />
         </div>
       </div>
+      <datalist id="subject-suggestions">
+        {subjectSuggestions.map((s) => (
+          <option key={s} value={s} />
+        ))}
+      </datalist>
       <FieldError message={errors.attachment} />
+      {saveError && (
+        <div className="ta-notice err" style={{ marginTop: "10px" }}>
+          <i className="fa-solid fa-circle-exclamation" /> {saveError}
+        </div>
+      )}
 
       <div className="tf-actions" style={{ marginTop: "18px" }}>
-        <button className="a-add-btn" onClick={save}>
-          <i className="fa-solid fa-check" /> Publish Resource
+        <button className="a-add-btn" onClick={save} disabled={saving}>
+          <i className={`fa-solid ${saving ? "fa-spinner fa-spin" : "fa-check"}`} /> {saving ? "Publishing…" : "Publish Resource"}
         </button>
-        <button className="btn-ghost" type="button" onClick={resetForm}>
+        <button className="btn-ghost" type="button" onClick={resetForm} disabled={saving}>
           Reset
         </button>
       </div>

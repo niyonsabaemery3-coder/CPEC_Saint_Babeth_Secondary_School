@@ -341,12 +341,100 @@ async function runApplicationTemplatesMigration() {
   );
 }
 
+async function runAboutHistoryMigration() {
+  // Adds the `about_history` column to site_content for databases created
+  // before the Our History section was added.
+  const [[col]] = await db.query(
+    "SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'site_content' AND COLUMN_NAME = 'about_history'"
+  );
+  if (Number(col?.cnt) === 0) {
+    console.log("🔧 Adding about_history column...");
+    await db.query("ALTER TABLE site_content ADD COLUMN about_history TEXT AFTER about_para2");
+    console.log("✔ about_history column added.");
+  }
+}
+
+async function runSchoolClassEnumMigration() {
+  // Replaces the old ENUM (SC_SOD, L3MLT … SC_MLT) with the new set
+  // (L3MRT, L4MRT, L5MRT, OTHER).  We first widen the column to VARCHAR so
+  // existing rows survive, migrate old values to their new equivalents, then
+  // tighten back to the correct ENUM.  Safe to run multiple times — the
+  // information_schema check exits early once the new ENUM is already in place.
+  const [[col]] = await db.query(`
+    SELECT COLUMN_TYPE
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME   = 'resources'
+      AND COLUMN_NAME  = 'school_class'
+  `);
+  const currentType = (col?.COLUMN_TYPE || "").toLowerCase();
+  // If the column already contains 'l3mrt' or 'other' the migration is done.
+  if (currentType.includes("l3mrt") || currentType.includes("other")) {
+    return;
+  }
+
+  console.log("🔧 Migrating school_class ENUM to new values…");
+
+  // 1. Widen to VARCHAR so no row is rejected during the data fix.
+  await db.query("ALTER TABLE resources MODIFY COLUMN school_class VARCHAR(20) NOT NULL DEFAULT 'OTHER'");
+
+  // 2. Map old values → new values in resources.
+  const resourceMap = [
+    ["SC_SOD", "OTHER"],
+    ["L3MLT", "L3MRT"],
+    ["L4MLT", "L4MRT"],
+    ["L5MLT", "L5MRT"],
+    ["SC_MLT", "OTHER"],
+    // Empty string from previously broken saves → OTHER
+    ["", "OTHER"],
+  ];
+  for (const [oldVal, newVal] of resourceMap) {
+    await db.query("UPDATE resources SET school_class = ? WHERE school_class = ?", [newVal, oldVal]);
+  }
+
+  // 3. Re-apply the correct ENUM.
+  await db.query(
+    "ALTER TABLE resources MODIFY COLUMN school_class ENUM('S1','S2','S3','L3SOD','L4SOD','L5SOD','L3MRT','L4MRT','L5MRT','OTHER') NOT NULL DEFAULT 'OTHER'"
+  );
+
+  // 4. Do the same for student_accounts (same class list, same logic).
+  const [[stCol]] = await db.query(`
+    SELECT COLUMN_TYPE
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME   = 'student_accounts'
+      AND COLUMN_NAME  = 'school_class'
+  `);
+  const stType = (stCol?.COLUMN_TYPE || "").toLowerCase();
+  if (!stType.includes("l3mrt") && !stType.includes("other")) {
+    await db.query("ALTER TABLE student_accounts MODIFY COLUMN school_class VARCHAR(20) NOT NULL DEFAULT 'OTHER'");
+    const studentMap = [
+      ["SC_SOD", "OTHER"],
+      ["L3MLT", "L3MRT"],
+      ["L4MLT", "L4MRT"],
+      ["L5MLT", "L5MRT"],
+      ["SC_MLT", "OTHER"],
+      ["", "OTHER"],
+    ];
+    for (const [oldVal, newVal] of studentMap) {
+      await db.query("UPDATE student_accounts SET school_class = ? WHERE school_class = ?", [newVal, oldVal]);
+    }
+    await db.query(
+      "ALTER TABLE student_accounts MODIFY COLUMN school_class ENUM('S1','S2','S3','L3SOD','L4SOD','L5SOD','L3MRT','L4MRT','L5MRT','OTHER') NOT NULL DEFAULT 'OTHER'"
+    );
+  }
+
+  console.log("✔ school_class ENUM updated on resources and student_accounts.");
+}
+
 async function runMigrations() {
+  await runAboutHistoryMigration();
   await runGalleryMigration();
   await runHeroMigration();
   await runApplicationTemplatesMigration();
   await runNewsEventsMigration();
   await runProgramSectionsMigration();
+  await runSchoolClassEnumMigration();
 
   const [cols] = await db.query(
     "SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'site_content' AND COLUMN_NAME = 'allow_student_register'"

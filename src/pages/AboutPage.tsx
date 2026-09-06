@@ -17,7 +17,7 @@ export default function AboutPage() {
   return (
     <>
       <PageHeader eyebrow={banner.eyebrow} title={banner.title} subtitle={banner.subtitle} bgImage={banner.bgImage} />
-      <About />
+      <About teaser={false} />
     </>
   );
 }

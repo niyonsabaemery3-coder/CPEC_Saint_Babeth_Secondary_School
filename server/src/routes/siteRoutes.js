@@ -68,6 +68,7 @@ async function assembleSiteContent(req) {
     aboutTitle: site.about_title,
     aboutPara1: site.about_para1,
     aboutPara2: site.about_para2,
+    aboutHistory: site.about_history || "",
     mission: site.mission || "",
     vision: site.vision || "",
     coreValues,
@@ -143,6 +144,50 @@ router.put("/home", requireAdmin, async (req, res, next) => {
   }
 });
 
+// -------------------------------------------------- HOME: HERO IMAGES --
+// Saves ONLY the heroImages array. Exists so the frontend can save each
+// hero image individually without re-uploading every image in the set.
+// Body: { heroImages: string[] }  (mix of data: URLs and existing paths)
+router.put("/home/hero-images", requireAdmin, async (req, res, next) => {
+  try {
+    await ensureSiteRow();
+    const b = req.body || {};
+
+    const [[existing]] = await pool.query("SELECT hero_img, hero_images FROM site_content WHERE id = 1");
+
+    // Parse the images currently on the server so we can detect what changed.
+    let serverImages = [];
+    try { serverImages = JSON.parse(existing?.hero_images || "[]"); } catch { serverImages = []; }
+    if (!serverImages.length && existing?.hero_img) serverImages = [existing.hero_img];
+
+    const requested = Array.isArray(b.heroImages) ? b.heroImages : [];
+    const savedImages = [];
+
+    for (const image of requested) {
+      if (typeof image !== "string" || !image.trim()) continue;
+      if (image.startsWith("data:")) {
+        // New upload — convert base64 to a file on disk.
+        savedImages.push(await saveBase64File(image, "images"));
+      } else {
+        // Existing URL/path — keep as-is (no re-upload needed).
+        savedImages.push(toRelativeUploadPath(image));
+      }
+    }
+
+    if (!savedImages.length) return res.status(400).json({ error: "At least one image is required." });
+
+    const heroImg = savedImages[0];
+    await pool.query(
+      "UPDATE site_content SET hero_img = ?, hero_images = ? WHERE id = 1",
+      [heroImg, JSON.stringify(savedImages)]
+    );
+
+    res.json(await assembleSiteContent(req));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // --------------------------------------------------------------- ABOUT --
 // Owns ONLY: about_img, about_title, about_para1, about_para2, about_points.
 router.put("/about", requireAdmin, async (req, res, next) => {
@@ -165,8 +210,8 @@ router.put("/about", requireAdmin, async (req, res, next) => {
       : [];
 
     await conn.query(
-      `UPDATE site_content SET about_img = ?, about_title = ?, about_para1 = ?, about_para2 = ?, mission = ?, vision = ?, core_values = ? WHERE id = 1`,
-      [aboutImg, b.aboutTitle, b.aboutPara1, b.aboutPara2, b.mission || "", b.vision || "", JSON.stringify(coreValues)]
+      `UPDATE site_content SET about_img = ?, about_title = ?, about_para1 = ?, about_para2 = ?, about_history = ?, mission = ?, vision = ?, core_values = ? WHERE id = 1`,
+      [aboutImg, b.aboutTitle, b.aboutPara1, b.aboutPara2, b.aboutHistory || "", b.mission || "", b.vision || "", JSON.stringify(coreValues)]
     );
 
     await conn.query("DELETE FROM about_points WHERE site_content_id = 1");

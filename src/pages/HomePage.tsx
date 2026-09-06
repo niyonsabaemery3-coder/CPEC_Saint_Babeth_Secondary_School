@@ -29,7 +29,7 @@ export default function HomePage() {
   return (
     <>
       <Hero />
-      <About />
+      <About teaser />
       <ViewFullPage to="/about" label="More About Our School" />
       <Academics teaser />
       <ViewFullPage to="/academics" label="View All Academic Programs" />

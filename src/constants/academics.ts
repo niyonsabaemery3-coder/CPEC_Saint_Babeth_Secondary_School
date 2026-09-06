@@ -9,23 +9,23 @@ import type { SchoolClass } from "../types";
 export interface AcademicClass {
   value: SchoolClass;
   label: string;
-  group: "Ordinary Level" | "Software Development (SOD)" | "Multimedia Technology (MLT)";
+  group: "Ordinary Level" | "Software Development (SOD)" | "Multimedia Technology (MRT)" | "Other";
 }
 
 export const SCHOOL_CLASSES: AcademicClass[] = [
-  { value: "S1", label: "Senior 1 (S1)", group: "Ordinary Level" },
-  { value: "S2", label: "Senior 2 (S2)", group: "Ordinary Level" },
-  { value: "S3", label: "Senior 3 (S3)", group: "Ordinary Level" },
+  { value: "S1", label: "S1", group: "Ordinary Level" },
+  { value: "S2", label: "S2", group: "Ordinary Level" },
+  { value: "S3", label: "S3", group: "Ordinary Level" },
 
-  { value: "L3SOD", label: "Level 3 — Software Development (L3 SOD)", group: "Software Development (SOD)" },
-  { value: "L4SOD", label: "Level 4 — Software Development (L4 SOD)", group: "Software Development (SOD)" },
-  { value: "L5SOD", label: "Level 5 — Software Development (L5 SOD)", group: "Software Development (SOD)" },
-  { value: "SC_SOD", label: "Short Course — Software Development", group: "Software Development (SOD)" },
+  { value: "L3SOD", label: "L3 SOD", group: "Software Development (SOD)" },
+  { value: "L4SOD", label: "L4 SOD", group: "Software Development (SOD)" },
+  { value: "L5SOD", label: "L5 SOD", group: "Software Development (SOD)" },
 
-  { value: "L3MLT", label: "Level 3 — Multimedia Technology (L3 MLT)", group: "Multimedia Technology (MLT)" },
-  { value: "L4MLT", label: "Level 4 — Multimedia Technology (L4 MLT)", group: "Multimedia Technology (MLT)" },
-  { value: "L5MLT", label: "Level 5 — Multimedia Technology (L5 MLT)", group: "Multimedia Technology (MLT)" },
-  { value: "SC_MLT", label: "Short Course — Multimedia Technology", group: "Multimedia Technology (MLT)" },
+  { value: "L3MRT", label: "L3 MRT", group: "Multimedia Technology (MRT)" },
+  { value: "L4MRT", label: "L4 MRT", group: "Multimedia Technology (MRT)" },
+  { value: "L5MRT", label: "L5 MRT", group: "Multimedia Technology (MRT)" },
+
+  { value: "OTHER", label: "Other", group: "Other" },
 ];
 
 export const SCHOOL_CLASS_VALUES: SchoolClass[] = SCHOOL_CLASSES.map((c) => c.value);

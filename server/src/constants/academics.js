@@ -7,11 +7,10 @@ const SCHOOL_CLASS_VALUES = [
   "L3SOD",
   "L4SOD",
   "L5SOD",
-  "SC_SOD",
-  "L3MLT",
-  "L4MLT",
-  "L5MLT",
-  "SC_MLT",
+  "L3MRT",
+  "L4MRT",
+  "L5MRT",
+  "OTHER",
 ];
 
 module.exports = { SCHOOL_CLASS_VALUES };

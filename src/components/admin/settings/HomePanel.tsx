@@ -1,16 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../../context/AppContext";
+import { api } from "../../../lib/api";
 import FField from "./FField";
 import ImgTile from "./ImgTile";
 import SettingsMsg from "./SettingsMsg";
 import { pick } from "../../../utils/pick";
 
-// The ONLY fields this panel is allowed to write back — saving here must
-// never touch fields owned by other panels (About, Gallery, Contact, …),
-// even if this panel's local draft happens to be stale for those keys.
-const OWNED_KEYS = [
-  "heroImg",
-  "heroImages",
+// Text-field keys owned by this panel — these are saved via PUT /api/site/home.
+// heroImg / heroImages are intentionally excluded here; they are saved
+// individually via PUT /api/site/home/hero-images (one call per image row).
+const TEXT_KEYS = [
   "heroMain",
   "heroAccent",
   "heroSub",
@@ -22,57 +21,104 @@ const OWNED_KEYS = [
   "feat3Desc",
 ] as const;
 
+// Per-image save state shape
+type ImgRowState = { saving: boolean; saved: boolean; error: string | null };
+const freshRowState = (): ImgRowState => ({ saving: false, saved: false, error: null });
+
 export default function HomePanel() {
-  const { site, saveSiteSection } = useApp();
+  const { site, saveSiteSection, setSite } = useApp();
   const [draft, setDraft] = useState(site);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
-  // Re-sync once real data arrives from the server (covers opening this
-  // panel before the initial /api/site fetch has resolved).
-  useEffect(() => setDraft(site), [site]);
+  // Text-section save state
+  const [textSaving, setTextSaving] = useState(false);
+  const [textSaved, setTextSaved] = useState(false);
+  const [textError, setTextError] = useState<string | null>(null);
 
+  // Per-image row save state — one entry per slot in heroImages
+  const [rowStates, setRowStates] = useState<ImgRowState[]>([]);
+
+  // Keep draft and rowStates in sync when server data arrives
+  useEffect(() => {
+    setDraft(site);
+    const images = site.heroImages?.length ? site.heroImages : [site.heroImg];
+    setRowStates(images.map(() => freshRowState()));
+  }, [site]);
+
+  // ---------------------------------------------------------------- helpers
   const heroImages = draft.heroImages?.length ? draft.heroImages : [draft.heroImg];
 
   const setHeroImages = (images: string[]) => {
-    setDraft((current) => ({ ...current, heroImages: images, heroImg: images[0] || current.heroImg }));
+    setDraft((d) => ({ ...d, heroImages: images, heroImg: images[0] || d.heroImg }));
+    // Grow / shrink rowStates to match
+    setRowStates((prev) => {
+      const next = [...prev];
+      while (next.length < images.length) next.push(freshRowState());
+      return next.slice(0, images.length);
+    });
   };
+
+  const setRowState = (index: number, patch: Partial<ImgRowState>) =>
+    setRowStates((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
 
   const addHeroImage = () => setHeroImages([...heroImages, ""]);
 
   const removeHeroImage = (index: number) => {
     if (heroImages.length <= 1) return;
-    setHeroImages(heroImages.filter((_, imageIndex) => imageIndex !== index));
+    setHeroImages(heroImages.filter((_, i) => i !== index));
   };
 
   const moveHeroImage = (index: number, direction: -1 | 1) => {
     const target = index + direction;
     if (target < 0 || target >= heroImages.length) return;
-    const next = [...heroImages];
-    [next[index], next[target]] = [next[target], next[index]];
-    setHeroImages(next);
+    const nextImgs = [...heroImages];
+    [nextImgs[index], nextImgs[target]] = [nextImgs[target], nextImgs[index]];
+    setHeroImages(nextImgs);
   };
 
   const set = <K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
 
-  const save = async () => {
-    setSaving(true);
-    setError(null);
-    setSaved(false);
+  // ------------------------------------------- save ONE image row --------
+  // Sends the FULL current heroImages array to the server so that ordering
+  // and removals are always reflected. The base64 of a newly picked image
+  // is only present in draft, so only that slot triggers a real upload.
+  const saveImageRow = async (index: number) => {
+    const images = draft.heroImages?.length ? draft.heroImages : [draft.heroImg];
+    // Guard: must have an image selected in this slot
+    if (!images[index]?.trim()) {
+      setRowState(index, { error: "Pick an image first.", saving: false, saved: false });
+      return;
+    }
+    setRowState(index, { saving: true, saved: false, error: null });
     try {
-      // Only this panel's own fields are sent — PUT /api/site/home, which on
-      // the backend can only ever write hero_*/feat*_ columns.
-      await saveSiteSection("home", pick(draft, OWNED_KEYS));
-      setSaved(true);
+      const saved = await api.put<typeof site>("/api/site/home/hero-images", { heroImages: images }, "admin");
+      // Merge server response back into global context so the live site
+      // immediately reflects the new images.
+      setSite((prev) => ({ ...prev, ...saved }));
+      // Update local draft with the resolved URLs the server returned
+      setDraft((d) => ({ ...d, heroImages: saved.heroImages, heroImg: saved.heroImg }));
+      setRowState(index, { saving: false, saved: true, error: null });
     } catch {
-      setError("Failed to save. Please try again.");
-    } finally {
-      setSaving(false);
+      setRowState(index, { saving: false, saved: false, error: "Failed to save. Try again." });
     }
   };
 
+  // ------------------------------------------- save text fields ----------
+  const saveText = async () => {
+    setTextSaving(true);
+    setTextError(null);
+    setTextSaved(false);
+    try {
+      await saveSiteSection("home", pick(draft, TEXT_KEYS));
+      setTextSaved(true);
+    } catch {
+      setTextError("Failed to save. Please try again.");
+    } finally {
+      setTextSaving(false);
+    }
+  };
+
+  // ---------------------------------------------------------------- render
   return (
     <>
       <h3>Home</h3>
@@ -82,34 +128,89 @@ export default function HomePanel() {
         <div className="home-hero-images-head">
           <div>
             <h5>Hero slideshow images</h5>
-            <p>Images change automatically every 3 seconds on the homepage.</p>
+            <p>Images change automatically every 3 seconds on the homepage. Save each image individually.</p>
           </div>
           <button type="button" className="a-add-btn" onClick={addHeroImage}>
             <i className="fa-solid fa-plus" /> Add image
           </button>
         </div>
+
         <div className="home-hero-images-list">
-          {heroImages.map((image, index) => (
-            <div className="home-hero-image-row" key={index}>
-              <div className="home-hero-image-number">{index + 1}</div>
-              <ImgTile src={image} onChange={(value) => {
-                const next = [...heroImages];
-                next[index] = value;
-                setHeroImages(next);
-              }} />
-              <div className="home-hero-image-actions">
-                <button type="button" className="a-del-btn" onClick={() => removeHeroImage(index)} disabled={heroImages.length <= 1} title="Remove image">
-                  <i className="fa-solid fa-trash" />
-                </button>
-                <button type="button" className="btn-ghost" onClick={() => moveHeroImage(index, -1)} disabled={index === 0} title="Move image left">
-                  <i className="fa-solid fa-arrow-left" />
-                </button>
-                <button type="button" className="btn-ghost" onClick={() => moveHeroImage(index, 1)} disabled={index === heroImages.length - 1} title="Move image right">
-                  <i className="fa-solid fa-arrow-right" />
-                </button>
+          {heroImages.map((image, index) => {
+            const rs = rowStates[index] ?? freshRowState();
+            return (
+              <div className="home-hero-image-row" key={index}>
+                <div className="home-hero-image-number">{index + 1}</div>
+
+                <ImgTile
+                  src={image}
+                  onChange={(value) => {
+                    const next = [...heroImages];
+                    next[index] = value;
+                    setHeroImages(next);
+                    // Clear stale feedback when a new image is picked
+                    setRowState(index, freshRowState());
+                  }}
+                />
+
+                <div className="home-hero-image-actions">
+                  {/* Per-image Save button */}
+                  <button
+                    type="button"
+                    className="a-add-btn"
+                    onClick={() => saveImageRow(index)}
+                    disabled={rs.saving}
+                    title="Save this image"
+                    style={{ fontSize: "11px", padding: "6px 10px" }}
+                  >
+                    {rs.saving ? (
+                      <><i className="fa-solid fa-spinner fa-spin" /> Saving…</>
+                    ) : rs.saved ? (
+                      <><i className="fa-solid fa-check" /> Saved</>
+                    ) : (
+                      <><i className="fa-solid fa-floppy-disk" /> Save</>
+                    )}
+                  </button>
+
+                  {rs.error && (
+                    <span style={{ fontSize: "10px", color: "var(--red, #c0392b)", textAlign: "center", lineHeight: 1.3 }}>
+                      {rs.error}
+                    </span>
+                  )}
+
+                  <button
+                    type="button"
+                    className="a-del-btn"
+                    onClick={() => removeHeroImage(index)}
+                    disabled={heroImages.length <= 1}
+                    title="Remove image"
+                  >
+                    <i className="fa-solid fa-trash" />
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => moveHeroImage(index, -1)}
+                    disabled={index === 0}
+                    title="Move up"
+                  >
+                    <i className="fa-solid fa-arrow-up" />
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => moveHeroImage(index, 1)}
+                    disabled={index === heroImages.length - 1}
+                    title="Move down"
+                  >
+                    <i className="fa-solid fa-arrow-down" />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -131,12 +232,12 @@ export default function HomePanel() {
       </div>
 
       <SettingsMsg
-        text={error || "Home page updated — exit to the website to see it live."}
-        type={error ? "err" : saved ? "ok" : null}
+        text={textError || "Text changes saved — exit to the website to see them live."}
+        type={textError ? "err" : textSaved ? "ok" : null}
       />
       <div className="sp-save-row">
-        <button className="a-add-btn" onClick={save} disabled={saving}>
-          <i className="fa-solid fa-check" /> {saving ? "Saving..." : "Save changes"}
+        <button className="a-add-btn" onClick={saveText} disabled={textSaving}>
+          <i className="fa-solid fa-check" /> {textSaving ? "Saving..." : "Save text changes"}
         </button>
       </div>
     </>

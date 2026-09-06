@@ -72,6 +72,7 @@ export interface SiteContent {
   aboutTitle: string;
   aboutPara1: string;
   aboutPara2: string;
+  aboutHistory: string;
   mission: string;
   vision: string;
   coreValues: string[];
@@ -151,11 +152,10 @@ export type SchoolClass =
   | "L3SOD"
   | "L4SOD"
   | "L5SOD"
-  | "SC_SOD"
-  | "L3MLT"
-  | "L4MLT"
-  | "L5MLT"
-  | "SC_MLT";
+  | "L3MRT"
+  | "L4MRT"
+  | "L5MRT"
+  | "OTHER";
 export type AccountStatus = "pending" | "active" | "deactivated";
 
 export interface TeacherAccount {
@@ -206,12 +206,12 @@ export interface StudentReport {
 
 export type Theme = "light" | "dark";
 
-export type AdminView = "dash" | "apps" | "teach" | "students" | "newsEvents" | "settings";
+export type AdminView = "dash" | "apps" | "teach" | "students" | "newsEvents" | "settings" | "profile";
 export type TeachAdminTab = "accounts" | "resources";
 export type StudentsAdminTab = "accounts" | "reports";
 export type NewsEventsAdminTab = "news" | "events";
-export type TeacherView = "resources" | "add" | "profile" | "settings";
-export type StudentView = "resources" | "reports" | "profile";
+export type TeacherView = "home" | "resources" | "add" | "profile" | "settings";
+export type StudentView = "home" | "resources" | "reports" | "profile";
 export type SettingsSection =
   | "security"
   | "registration"

@@ -13,6 +13,12 @@ const TYPE_LABEL: Record<ResourceType, string> = {
   pastpaper: "Past Paper",
 };
 
+const TYPE_ICON: Record<ResourceType, string> = {
+  notes: "fa-note-sticky",
+  presentation: "fa-display",
+  pastpaper: "fa-file-lines",
+};
+
 const PAGE_SIZE = 10;
 
 export default function MyResourcesView() {
@@ -189,6 +195,25 @@ export default function MyResourcesView() {
       {editing && (
         <div className="teacher-form-card show" style={{ marginBottom: 16 }}>
           <h5 style={{ margin: "0 0 10px" }}>Edit Resource</h5>
+
+          <div className="rc-preview-label" style={{ marginBottom: 8 }}>Preview</div>
+          <div style={{ marginBottom: 16, display: "flex", justifyContent: "center" }}>
+            <div className={`resource-card type-${rType}`} style={{ width: "100%", maxWidth: 300, boxShadow: "none", border: "1px dashed var(--line)" }}>
+              <div className="rc-type-icon">
+                <i className={`fa-solid ${TYPE_ICON[rType]}`} />
+              </div>
+              <div className="rc-title">{title.trim() || editing.title}</div>
+              <div className="rc-meta">
+                <span className="rc-chip rc-chip-class"><i className="fa-solid fa-school" style={{ marginRight: 4 }} />{schoolClass}</span>
+                <span className="rc-chip">{subject.trim() || editing.subject}</span>
+                <span className="rc-chip">{TYPE_LABEL[rType]}</span>
+              </div>
+              <div className="rc-uploader">
+                <i className="fa-solid fa-chalkboard-user" /> {editing.uploaderName}
+              </div>
+            </div>
+          </div>
+
           <div className="a-form-grid">
             <div>
               <input

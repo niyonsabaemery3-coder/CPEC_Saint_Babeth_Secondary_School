@@ -169,6 +169,7 @@ CREATE TABLE IF NOT EXISTS site_content (
   about_title     VARCHAR(200),
   about_para1     TEXT,
   about_para2     TEXT,
+  about_history   TEXT,
   mission         TEXT,
   vision          TEXT,
   core_values     LONGTEXT,
