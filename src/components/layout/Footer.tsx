@@ -35,7 +35,7 @@ export default function Footer({ onOpenLogin }: FooterProps) {
           <ul>
             <li><Link to="/academics">Academic Programs</Link></li>
             <li><Link to="/admissions">Admissions</Link></li>
-            <li><Link to="/teachers">Our Teachers</Link></li>
+            <li><Link to="/teachers">Our Team</Link></li>
             <li><Link to="/resources">Resources</Link></li>
             <li><Link to="/contact">Contact</Link></li>
           </ul>

@@ -11,7 +11,7 @@ import SettingsView from "./views/SettingsView";
 const NAV: { key: AdminView; icon: string; label: string }[] = [
   { key: "dash",       icon: "fa-gauge-high",      label: "Dashboard"    },
   { key: "apps",       icon: "fa-file-lines",      label: "Applications" },
-  { key: "teach",      icon: "fa-chalkboard-user", label: "Teachers"     },
+  { key: "teach",      icon: "fa-chalkboard-user", label: "Team"         },
   { key: "students",   icon: "fa-user-graduate",   label: "Students"     },
   { key: "newsEvents", icon: "fa-calendar-days",   label: "News & Events" },
   { key: "settings",   icon: "fa-gear",            label: "Settings"     },
@@ -20,7 +20,7 @@ const NAV: { key: AdminView; icon: string; label: string }[] = [
 const TITLES: Record<AdminView, string> = {
   dash:       "Dashboard",
   apps:       "Applications",
-  teach:      "Teachers",
+  teach:      "Team",
   students:   "Students",
   newsEvents: "News & Events",
   settings:   "Settings",

@@ -27,7 +27,7 @@ export default function Teachers({ teaser = false }: TeachersProps) {
         <div className="eyebrow">
           <span className="bar" /> Our Team
         </div>
-        <h2>Meet our teachers</h2>
+        <h2>Meet our team</h2>
         <p>Dedicated educators guiding every student in and beyond the classroom.</p>
       </div>
 
@@ -59,7 +59,7 @@ export default function Teachers({ teaser = false }: TeachersProps) {
                 <i className="fa-solid fa-chevron-up" /> Show Less
               </>
             ) : (
-              <>View More Teachers <i className="fa-solid fa-arrow-right" /></>
+              <>View More Team <i className="fa-solid fa-arrow-right" /></>
             )}
           </button>
         </div>

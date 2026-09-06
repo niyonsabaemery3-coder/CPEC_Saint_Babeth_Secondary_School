@@ -18,7 +18,7 @@ const MENU: { key: SettingsSection; icon: string; title: string; desc: string; i
   { key: "home", icon: "fa-house", title: "Home", desc: "Edit hero section & highlight cards" },
   { key: "about", icon: "fa-circle-info", title: "About", desc: "Edit the About Our School section" },
   { key: "academics", icon: "fa-graduation-cap", title: "Academics", desc: "Edit programs & technology track" },
-  { key: "teachers", icon: "fa-chalkboard-user", title: "Teachers", desc: "Manage the teachers list" },
+  { key: "teachers", icon: "fa-chalkboard-user", title: "Team", desc: "Manage the school team list" },
   { key: "gallery", icon: "fa-images", title: "Gallery", desc: "Swap photos & edit captions" },
   { key: "contact", icon: "fa-address-book", title: "Contact", desc: "Edit address, phone & office hours" },
   { key: "banners", icon: "fa-panorama", title: "Page Banners", desc: "Edit each page's title banner text & background photo" },

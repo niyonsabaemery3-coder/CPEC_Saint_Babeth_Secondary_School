@@ -15,7 +15,7 @@ export default function AcademicsPanel() {
 
   useEffect(() => setDraft(site), [site]);
 
-  const setProgram = (index: number, key: "title" | "desc", value: string) => {
+  const setProgram = (index: number, key: "section" | "title" | "desc", value: string) => {
     const next = [...draft.programs] as typeof draft.programs;
     next[index] = { ...next[index], [key]: value };
     setDraft((d) => ({ ...d, programs: next }));
@@ -46,6 +46,11 @@ export default function AcademicsPanel() {
         <h5>Programs</h5>
         {draft.programs.map((p, i) => (
           <div key={i}>
+            <FField
+              label={`Program ${i + 1} section / level`}
+              value={p.section || "Ordinary Level"}
+              onChange={(v) => setProgram(i, "section", v)}
+            />
             <FField label={`Program ${i + 1} title`} value={p.title} onChange={(v) => setProgram(i, "title", v)} />
             <FField label={`Program ${i + 1} description`} value={p.desc} onChange={(v) => setProgram(i, "desc", v)} multiline />
           </div>

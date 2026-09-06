@@ -1,13 +1,48 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useApp } from "../../context/AppContext";
-import { useStaggerText } from "../../hooks/useScrollAnimations";
+import { useCountUp, useStaggerText } from "../../hooks/useScrollAnimations";
 
 export default function Hero() {
-  const { site } = useApp();
+  const { site, teachers, resources, studentAccounts } = useApp();
+  const heroImages = site.heroImages?.length ? site.heroImages : [site.heroImg];
+  const heroImageKey = heroImages.join("|");
+  const [heroIndex, setHeroIndex] = useState(0);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const featuresRef = useRef<HTMLDivElement>(null);
+
+  const compactNumber = (value: number) => {
+    if (!Number.isFinite(value)) return "0";
+    if (value < 1000) return String(value);
+    const compact = value / 1000;
+    return compact >= 100 ? `${Math.round(compact)}K` : `${compact.toFixed(1).replace(/\.0$/, "")}K`;
+  };
+
+  const statCards = [
+    { icon: "fa-users", value: studentAccounts.length, label: "Students", to: "/students" },
+    { icon: "fa-graduation-cap", value: site.programs.length, label: "Academic Programs", to: "/academics" },
+    { icon: "fa-chalkboard-user", value: teachers.length, label: "Teachers", to: "/teachers" },
+    { icon: "fa-book-open", value: resources.length, label: "Learning Resources", to: "/resources" },
+  ];
 
   useStaggerText(titleRef, `${site.heroMain} ${site.heroAccent}`);
+  useCountUp(featuresRef);
+
+  useEffect(() => {
+    setHeroIndex((current) => Math.min(current, heroImages.length - 1));
+    if (heroImages.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setHeroIndex((current) => (current + 1) % heroImages.length);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [heroImages.length]);
+
+  useEffect(() => {
+    if (heroImages.length <= 1) return;
+    const nextImage = new Image();
+    nextImage.decoding = "async";
+    nextImage.src = heroImages[(heroIndex + 1) % heroImages.length];
+  }, [heroImageKey, heroIndex]);
 
   return (
     <section id="home" className="card">
@@ -32,11 +67,14 @@ export default function Hero() {
         <div className="hero-media">
           <div className="glass-card p-4 sm:p-6 rounded-2xl">
             <img
-              src={site.heroImg}
+              key={heroImages[heroIndex]}
+              className="hero-slideshow-image"
+              src={heroImages[heroIndex]}
               alt="Students of CPEC Saint Babeth TSS"
               loading="eager"
               fetchPriority="high"
               decoding="async"
+              sizes="(max-width: 900px) 100vw, 50vw"
               width={900}
               height={700}
             />
@@ -44,38 +82,20 @@ export default function Hero() {
         </div>
       </div>
 
-      <div className="features" aria-label="CPEC Saint Babeth school facts">
-        {[
-          {
-            icon: "fa-layer-group",
-            value: site.programs.length,
-            label: "Programs Offered",
-            to: "/academics",
-          },
-          {
-            icon: "fa-laptop-code",
-            value: 3,
-            label: "Technology Pathways",
-            to: "/academics",
-          },
-          {
-            icon: "fa-shield-heart",
-            value: site.aboutLi.length,
-            label: "School Commitments",
-            to: "/about",
-          },
-          {
-            icon: "fa-images",
-            value: site.gallery.length,
-            label: "Campus Highlights",
-            to: "/gallery",
-          },
-        ].map((stat) => (
+      <div className="features" ref={featuresRef} aria-label="CPEC Saint Babeth school facts">
+        {statCards.map((stat) => (
           <Link key={stat.label} to={stat.to} className="feature">
             <span className="icon" aria-hidden="true">
               <i className={`fa-solid ${stat.icon}`} />
             </span>
-            <strong className="feature-value">{stat.value}</strong>
+            <strong
+              className="feature-value"
+              data-count={stat.value}
+              data-format={stat.value >= 1000 ? "compact" : "plain"}
+              aria-label={String(stat.value)}
+            >
+              {compactNumber(stat.value)}
+            </strong>
             <h4>{stat.label}</h4>
           </Link>
         ))}

@@ -20,7 +20,7 @@ const NAV_LINKS: readonly NavEntry[] = [
   {
     label: "School",
     children: [
-      { to: "/teachers", label: "Teachers" },
+      { to: "/teachers", label: "Team" },
       { to: "/admissions", label: "Admissions" },
     ],
   },
@@ -89,7 +89,7 @@ export default function Navbar({ onOpenLogin }: NavbarProps) {
                 </button>
               )}
               <div className="nav-dropdown-menu">
-                {l.children.map((child) => <NavLink key={child.to} to={child.to} onClick={selectDropdownItem} className={location.pathname === child.to || location.pathname.startsWith(`${child.to}/`) ? "active" : ""}>{child.label}</NavLink>)}
+                {l.children.map((child) => <NavLink key={child.to} to={child.to} onClick={(event) => { selectDropdownItem(event); closeDesktopDropdown(); }} className={location.pathname === child.to || location.pathname.startsWith(`${child.to}/`) ? "active" : ""}>{child.label}</NavLink>)}
               </div>
             </div>
           ) : l.to ? (

@@ -10,6 +10,7 @@ import { pick } from "../../../utils/pick";
 // even if this panel's local draft happens to be stale for those keys.
 const OWNED_KEYS = [
   "heroImg",
+  "heroImages",
   "heroMain",
   "heroAccent",
   "heroSub",
@@ -31,6 +32,27 @@ export default function HomePanel() {
   // Re-sync once real data arrives from the server (covers opening this
   // panel before the initial /api/site fetch has resolved).
   useEffect(() => setDraft(site), [site]);
+
+  const heroImages = draft.heroImages?.length ? draft.heroImages : [draft.heroImg];
+
+  const setHeroImages = (images: string[]) => {
+    setDraft((current) => ({ ...current, heroImages: images, heroImg: images[0] || current.heroImg }));
+  };
+
+  const addHeroImage = () => setHeroImages([...heroImages, ""]);
+
+  const removeHeroImage = (index: number) => {
+    if (heroImages.length <= 1) return;
+    setHeroImages(heroImages.filter((_, imageIndex) => imageIndex !== index));
+  };
+
+  const moveHeroImage = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= heroImages.length) return;
+    const next = [...heroImages];
+    [next[index], next[target]] = [next[target], next[index]];
+    setHeroImages(next);
+  };
 
   const set = <K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
@@ -57,8 +79,38 @@ export default function HomePanel() {
       <p className="sp-sub">Edit the homepage hero, image and highlight cards.</p>
 
       <div className="sp-block">
-        <h5>Hero image</h5>
-        <ImgTile src={draft.heroImg} onChange={(v) => set("heroImg", v)} />
+        <div className="home-hero-images-head">
+          <div>
+            <h5>Hero slideshow images</h5>
+            <p>Images change automatically every 3 seconds on the homepage.</p>
+          </div>
+          <button type="button" className="a-add-btn" onClick={addHeroImage}>
+            <i className="fa-solid fa-plus" /> Add image
+          </button>
+        </div>
+        <div className="home-hero-images-list">
+          {heroImages.map((image, index) => (
+            <div className="home-hero-image-row" key={index}>
+              <div className="home-hero-image-number">{index + 1}</div>
+              <ImgTile src={image} onChange={(value) => {
+                const next = [...heroImages];
+                next[index] = value;
+                setHeroImages(next);
+              }} />
+              <div className="home-hero-image-actions">
+                <button type="button" className="a-del-btn" onClick={() => removeHeroImage(index)} disabled={heroImages.length <= 1} title="Remove image">
+                  <i className="fa-solid fa-trash" />
+                </button>
+                <button type="button" className="btn-ghost" onClick={() => moveHeroImage(index, -1)} disabled={index === 0} title="Move image left">
+                  <i className="fa-solid fa-arrow-left" />
+                </button>
+                <button type="button" className="btn-ghost" onClick={() => moveHeroImage(index, 1)} disabled={index === heroImages.length - 1} title="Move image right">
+                  <i className="fa-solid fa-arrow-right" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="sp-block">

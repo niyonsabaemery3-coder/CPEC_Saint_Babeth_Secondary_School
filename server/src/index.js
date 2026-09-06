@@ -265,8 +265,27 @@ async function runNewsEventsMigration() {
   `);
 }
 
+async function runProgramSectionsMigration() {
+  const [[table]] = await db.query(
+    "SELECT COUNT(*) AS cnt FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'programs'"
+  );
+  if (!table || Number(table.cnt) === 0) return;
+
+  const [[column]] = await db.query(
+    "SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'programs' AND COLUMN_NAME = 'section'"
+  );
+  if (Number(column?.cnt) > 0) return;
+
+  console.log("🔧 Adding program section labels...");
+  await db.query(
+    "ALTER TABLE programs ADD COLUMN section VARCHAR(150) NOT NULL DEFAULT 'Ordinary Level' AFTER description"
+  );
+  console.log("✔ Program section labels are ready.");
+}
+
 async function runMigrations() {
   await runNewsEventsMigration();
+  await runProgramSectionsMigration();
 
   const [cols] = await db.query(
     "SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'site_content' AND COLUMN_NAME = 'allow_student_register'"

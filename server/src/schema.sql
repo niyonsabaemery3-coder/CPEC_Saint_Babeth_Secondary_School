@@ -115,11 +115,26 @@ CREATE TABLE IF NOT EXISTS applications (
   district         VARCHAR(100),
   sector           VARCHAR(100),
   parent_name      VARCHAR(150),
+  parent_email     VARCHAR(180),
   phone1           VARCHAR(30),
   phone2           VARCHAR(30),
   report_file_url  VARCHAR(500),
   report_file_name VARCHAR(255),
+  status           ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  feedback        TEXT,
+  feedback_file_url  VARCHAR(500),
+  feedback_file_name VARCHAR(255),
+  updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS application_feedback_templates (
+  id                 INT PRIMARY KEY DEFAULT 1,
+  pending_message    TEXT NOT NULL,
+  approved_message   TEXT NOT NULL,
+  rejected_message   TEXT NOT NULL,
+  updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT chk_application_feedback_templates_singleton CHECK (id = 1)
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------------
@@ -140,6 +155,7 @@ CREATE TABLE IF NOT EXISTS faqs (
 CREATE TABLE IF NOT EXISTS site_content (
   id              INT PRIMARY KEY DEFAULT 1,
   hero_img        VARCHAR(500),
+  hero_images     LONGTEXT,
   hero_main       VARCHAR(150),
   hero_accent     VARCHAR(150),
   hero_sub        TEXT,
@@ -153,6 +169,9 @@ CREATE TABLE IF NOT EXISTS site_content (
   about_title     VARCHAR(200),
   about_para1     TEXT,
   about_para2     TEXT,
+  mission         TEXT,
+  vision          TEXT,
+  core_values     LONGTEXT,
   strip_title     VARCHAR(200),
   strip_desc      TEXT,
   contact_address VARCHAR(300),
@@ -183,6 +202,7 @@ CREATE TABLE IF NOT EXISTS programs (
   site_content_id INT NOT NULL DEFAULT 1,
   title           VARCHAR(150) NOT NULL,
   description     TEXT,
+  section         VARCHAR(150) NOT NULL DEFAULT 'Ordinary Level',
   sort_order      INT NOT NULL DEFAULT 0,
   CONSTRAINT fk_programs_site
     FOREIGN KEY (site_content_id) REFERENCES site_content(id)
@@ -194,6 +214,7 @@ CREATE TABLE IF NOT EXISTS gallery_items (
   site_content_id INT NOT NULL DEFAULT 1,
   image_url       VARCHAR(500) NOT NULL,
   caption         VARCHAR(150),
+  category        VARCHAR(100) NOT NULL DEFAULT 'General',
   sort_order      INT NOT NULL DEFAULT 0,
   CONSTRAINT fk_gallery_items_site
     FOREIGN KEY (site_content_id) REFERENCES site_content(id)

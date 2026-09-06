@@ -9,7 +9,7 @@ const PAGES: { key: PageBannerKey; label: string }[] = [
   { key: "about", label: "About" },
   { key: "academics", label: "Academics" },
   { key: "admissions", label: "Admissions" },
-  { key: "teachers", label: "Teachers" },
+  { key: "teachers", label: "Team" },
   { key: "gallery", label: "Gallery" },
   { key: "contact", label: "Contact" },
 ];

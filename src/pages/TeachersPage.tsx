@@ -8,9 +8,9 @@ export default function TeachersPage() {
   const banner = pageBanners.teachers;
 
   useSEO({
-    title: "Our Teachers",
+    title: "Our Team",
     description:
-      "Meet the dedicated educators of CPEC Saint Babeth TSS, guiding every student in and beyond the classroom.",
+      "Meet the dedicated team of CPEC Saint Babeth TSS, guiding every student in and beyond the classroom.",
     path: "/teachers",
   });
 

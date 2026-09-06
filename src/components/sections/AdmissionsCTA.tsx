@@ -11,25 +11,26 @@ export default function AdmissionsCTA() {
   useFadeUp(ref);
 
   return (
-    <section id="apply" className="card" ref={ref}>
-      <div className="section-head">
-        <div className="eyebrow">
-          <span className="bar" /> Admissions
+    <section id="apply" className="card admissions-cta" ref={ref} aria-labelledby="admissions-cta-title">
+      <div className="admissions-cta-inner">
+        <div className="admissions-cta-copy">
+          <span className="admissions-cta-icon" aria-hidden="true">
+            <i className="fa-solid fa-graduation-cap" />
+          </span>
+          <div>
+            <h2 id="admissions-cta-title">Admissions Are Open!</h2>
+            <p>Join CPEC Saint Babeth TSS today. Apply online in minutes — no account required.</p>
+          </div>
         </div>
-        <h2>Ready to enroll?</h2>
-        <p>
-          Start your application online in a few simple steps — our admissions office will reach out on the phone
-          number you provide once it's reviewed.
-        </p>
-      </div>
 
-      <div className="cta-row">
-        <Link to="/admissions" className="btn-primary">
-          <i className="fa-solid fa-pen-to-square" /> Apply Now
-        </Link>
-        <Link to="/admissions" className="btn-outline">
-          Learn About Admissions
-        </Link>
+        <div className="admissions-cta-actions" aria-label="Admissions actions">
+          <Link to="/admissions" className="btn-primary admissions-cta-primary">
+            <i className="fa-solid fa-pen-to-square" aria-hidden="true" /> Apply Now
+          </Link>
+          <Link to="/track-application" className="btn-outline admissions-cta-secondary">
+            <i className="fa-solid fa-magnifying-glass" aria-hidden="true" /> Track application
+          </Link>
+        </div>
       </div>
     </section>
   );

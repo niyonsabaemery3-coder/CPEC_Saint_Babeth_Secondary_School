@@ -5,7 +5,7 @@ import ImgTile from "./ImgTile";
 import SettingsMsg from "./SettingsMsg";
 import { pick } from "../../../utils/pick";
 
-const OWNED_KEYS = ["aboutImg", "aboutTitle", "aboutPara1", "aboutPara2", "aboutLi"] as const;
+const OWNED_KEYS = ["aboutImg", "aboutTitle", "aboutPara1", "aboutPara2", "mission", "vision", "coreValues", "aboutLi"] as const;
 
 export default function AboutPanel() {
   const { site, saveSiteSection } = useApp();
@@ -22,13 +22,33 @@ export default function AboutPanel() {
     setDraft((d) => ({ ...d, aboutLi: next }));
   };
 
+  const setCoreValue = (index: number, value: string) => {
+    const next = [...draft.coreValues];
+    next[index] = value;
+    setDraft((d) => ({ ...d, coreValues: next }));
+  };
+
+  const addCoreValue = () => {
+    setDraft((d) => ({ ...d, coreValues: [...d.coreValues, "New core value"] }));
+  };
+
+  const removeCoreValue = (index: number) => {
+    setDraft((d) => ({ ...d, coreValues: d.coreValues.filter((_, i) => i !== index) }));
+  };
+
+  const addHighlight = () => {
+    setDraft((d) => ({ ...d, aboutLi: [...d.aboutLi, "New school highlight"] as typeof d.aboutLi }));
+  };
+
+  const removeHighlight = (index: number) => {
+    setDraft((d) => ({ ...d, aboutLi: d.aboutLi.filter((_, i) => i !== index) as typeof d.aboutLi }));
+  };
+
   const save = async () => {
     setSaving(true);
     setError(null);
     setSaved(false);
     try {
-      // Only About's own fields are sent — PUT /api/site/about, which on the
-      // backend can only ever write about_* columns + the about_points table.
       await saveSiteSection("about", pick(draft, OWNED_KEYS));
       setSaved(true);
     } catch {
@@ -53,9 +73,44 @@ export default function AboutPanel() {
         <FField label="Heading" value={draft.aboutTitle} onChange={(v) => setDraft((d) => ({ ...d, aboutTitle: v }))} />
         <FField label="Paragraph 1" value={draft.aboutPara1} onChange={(v) => setDraft((d) => ({ ...d, aboutPara1: v }))} multiline />
         <FField label="Paragraph 2" value={draft.aboutPara2} onChange={(v) => setDraft((d) => ({ ...d, aboutPara2: v }))} multiline />
-        {draft.aboutLi.map((item, i) => (
-          <FField key={i} label={`List item ${i + 1}`} value={item} onChange={(v) => setLi(i, v)} />
-        ))}
+        <FField label="Mission" value={draft.mission} onChange={(v) => setDraft((d) => ({ ...d, mission: v }))} multiline />
+        <FField label="Vision" value={draft.vision} onChange={(v) => setDraft((d) => ({ ...d, vision: v }))} multiline />
+
+        <div className="about-admin-values">
+          <div className="about-admin-values-head">
+            <strong>Core values</strong>
+            <button className="a-add-btn" onClick={addCoreValue} type="button">
+              <i className="fa-solid fa-plus" /> Add value
+            </button>
+          </div>
+
+          {draft.coreValues.map((item, i) => (
+            <div key={i} className="about-admin-value-row">
+              <FField label={`Core value ${i + 1}`} value={item} onChange={(v) => setCoreValue(i, v)} />
+              <button className="a-remove-btn" title="Remove value" onClick={() => removeCoreValue(i)} type="button">
+                <i className="fa-solid fa-trash" />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="about-admin-values">
+          <div className="about-admin-values-head">
+            <strong>School highlights</strong>
+            <button className="a-add-btn" onClick={addHighlight} type="button">
+              <i className="fa-solid fa-plus" /> Add highlight
+            </button>
+          </div>
+
+          {draft.aboutLi.map((item, i) => (
+            <div key={i} className="about-admin-value-row">
+              <FField label={`School highlight ${i + 1}`} value={item} onChange={(v) => setLi(i, v)} />
+              <button className="a-remove-btn" title="Remove highlight" onClick={() => removeHighlight(i)} type="button">
+                <i className="fa-solid fa-trash" />
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
 
       <SettingsMsg

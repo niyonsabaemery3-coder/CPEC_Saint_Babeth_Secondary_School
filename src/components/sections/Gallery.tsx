@@ -18,7 +18,12 @@ interface GalleryProps {
 export default function Gallery({ teaser = false }: GalleryProps) {
   const { site } = useApp();
   const fullGallery = site.gallery;
-  const gallery = teaser ? fullGallery.slice(0, PAGE_SIZE) : fullGallery;
+  const categories = Array.from(new Set(fullGallery.map((photo) => photo.category || "General")));
+  const [activeCategory, setActiveCategory] = useState("All Categories");
+  const filteredGallery = activeCategory === "All Categories"
+    ? fullGallery
+    : fullGallery.filter((photo) => (photo.category || "General") === activeCategory);
+  const gallery = teaser ? fullGallery.slice(0, PAGE_SIZE) : filteredGallery;
   const totalPages = teaser ? 1 : Math.max(1, Math.ceil(gallery.length / PAGE_SIZE));
   const [page, setPage] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -30,9 +35,15 @@ export default function Gallery({ teaser = false }: GalleryProps) {
     if (page > totalPages - 1) setPage(0);
   }, [totalPages, page]);
 
-  const start = page * PAGE_SIZE;
-  const visible = gallery.slice(start, start + PAGE_SIZE);
-  const hasPages = totalPages > 1;
+  useEffect(() => {
+    if (!categories.includes(activeCategory) && activeCategory !== "All Categories") setActiveCategory("All Categories");
+    setPage(0);
+    setLightboxIndex(null);
+  }, [activeCategory, categories.join("|")]);
+
+  const start = teaser ? page * PAGE_SIZE : 0;
+  const visible = teaser ? gallery.slice(start, start + PAGE_SIZE) : gallery;
+  const hasPages = teaser && totalPages > 1;
   // How many tiles are on THIS page — the grid layout adapts to this number
   // (1, 2, 3, 4 or 5) so a partial last page never leaves an empty gap.
   const count = visible.length;
@@ -71,6 +82,24 @@ export default function Gallery({ teaser = false }: GalleryProps) {
         <p>A glimpse into our classrooms, labs and school community.</p>
       </div>
 
+      {!teaser && categories.length > 0 && (
+        <div className="gallery-filters" aria-label="Gallery categories">
+          {[
+            "All Categories",
+            ...categories,
+          ].map((category) => (
+            <button
+              type="button"
+              key={category}
+              className={activeCategory === category ? "active" : ""}
+              onClick={() => setActiveCategory(category)}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="gal-wrap">
         {hasPages && (
           <button type="button" className="gal-nav-btn prev" onClick={goPrev} aria-label="Previous photos">
@@ -78,10 +107,10 @@ export default function Gallery({ teaser = false }: GalleryProps) {
           </button>
         )}
 
-        <div className={`gal-grid count-${count}`}>
+        <div className={`${teaser ? "gal-grid" : "gallery-portfolio-grid"} count-${count}`}>
           {visible.map((g, i) => (
             <div
-              className={`gal-item ${count === PAGE_SIZE && i === 0 ? "g1" : ""}`}
+              className={`gal-item ${teaser && count === PAGE_SIZE && i === 0 ? "g1" : ""}`}
               key={`${page}-${i}`}
               onClick={() => openLightbox(i)}
               role="button"

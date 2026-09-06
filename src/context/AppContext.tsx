@@ -60,13 +60,14 @@ const DEFAULT_PAGE_BANNERS: PageBanners = {
   about: { eyebrow: "About Our School", title: "Who We Are", subtitle: "Discipline, work and integrity guiding every student at CPEC Saint Babeth TSS.", bgImage: `${import.meta.env.BASE_URL}images/brand/school-gate.jpeg` },
   academics: { eyebrow: "Academics", title: "What We Teach", subtitle: "A well-rounded lower-secondary curriculum paired with in-demand technology skills.", bgImage: "" },
   admissions: { eyebrow: "Admissions", title: "Apply to CPEC Saint Babeth TSS", subtitle: "Start your application online — it only takes a few minutes.", bgImage: "" },
-  teachers: { eyebrow: "Our Team", title: "Meet Our Teachers", subtitle: "Dedicated educators guiding every student in and beyond the classroom.", bgImage: "" },
+  teachers: { eyebrow: "Our Team", title: "Meet Our Team", subtitle: "Dedicated educators and staff guiding every student in and beyond the classroom.", bgImage: "" },
   gallery: { eyebrow: "Gallery", title: "Life at Our School", subtitle: "A look at student life, facilities and campus moments.", bgImage: "" },
   contact: { eyebrow: "Contact", title: "Get In Touch", subtitle: "Reach out for admissions, partnerships, or general questions.", bgImage: "" },
 };
 
 const DEFAULT_SITE: SiteContent = {
   heroImg: `${import.meta.env.BASE_URL}images/brand/students-meeting.jpeg`,
+  heroImages: [`${import.meta.env.BASE_URL}images/brand/students-meeting.jpeg`],
   heroMain: "CPEC Saint Babeth",
   heroAccent: "TSS",
   heroSub:
@@ -84,6 +85,16 @@ const DEFAULT_SITE: SiteContent = {
     "CPEC Saint Babeth TSS is based in Byumba, Rwanda, offering lower secondary education (S1–S3) alongside specialised technology training. Our mission is to nurture disciplined, skilled and principled young people ready for the modern world.",
   aboutPara2:
     "Guided by our motto — Discipline, Work, Integrity — we combine strong academic fundamentals with practical Software Development, ICT and Multimedia Production skills that open doors beyond the classroom.",
+  mission:
+    "To provide a nurturing and disciplined learning environment where students grow academically, technically and personally through excellence in teaching, mentorship and character development.",
+  vision:
+    "To become a leading technical secondary school in Rwanda that produces confident, skilled and responsible graduates ready to contribute to society and the digital economy.",
+  coreValues: [
+    "Discipline and accountability",
+    "Hard work and excellence",
+    "Integrity and respect",
+    "Innovation and practical learning",
+  ],
   aboutLi: [
     "Certified teaching staff across all core subjects",
     "Dedicated computer lab for ICT & software classes",
@@ -92,19 +103,19 @@ const DEFAULT_SITE: SiteContent = {
   ],
 
   programs: [
-    { title: "Senior 1 (S1)", desc: "Foundational subjects in mathematics, sciences, languages and general studies, building strong learning habits from the start." },
-    { title: "Senior 2 (S2)", desc: "Deeper subject exploration with continued focus on discipline, teamwork and academic performance." },
-    { title: "Senior 3 (S3)", desc: "Consolidation year preparing students for national exams and future specialisation choices." },
+    { section: "Ordinary Level", title: "Senior 1 (S1)", desc: "Foundational subjects in mathematics, sciences, languages and general studies, building strong learning habits from the start." },
+    { section: "Ordinary Level", title: "Senior 2 (S2)", desc: "Deeper subject exploration with continued focus on discipline, teamwork and academic performance." },
+    { section: "Ordinary Level", title: "Senior 3 (S3)", desc: "Consolidation year preparing students for national exams and future specialisation choices." },
   ],
   stripTitle: "Subjects taught across our programs",
   stripDesc: "Hands-on classes designed to give students real, practical digital skills alongside their core curriculum.",
 
   gallery: [
-    { img: `${import.meta.env.BASE_URL}images/brand/students-meeting.jpeg`, cap: "Students gathered in school uniform" },
-    { img: `${import.meta.env.BASE_URL}images/brand/school-gate.jpeg`, cap: "Entrance to CPEC Saint Babeth Secondary School" },
-    { img: `${import.meta.env.BASE_URL}images/gallery/football-team.webp`, cap: "Football Team" },
-    { img: `${import.meta.env.BASE_URL}images/gallery/agriculture.webp`, cap: "Agriculture Club" },
-    { img: `${import.meta.env.BASE_URL}images/gallery/readers.webp`, cap: "Reading Time" },
+    { img: `${import.meta.env.BASE_URL}images/brand/students-meeting.jpeg`, cap: "Students gathered in school uniform", category: "Campus" },
+    { img: `${import.meta.env.BASE_URL}images/brand/school-gate.jpeg`, cap: "Entrance to CPEC Saint Babeth Secondary School", category: "Campus" },
+    { img: `${import.meta.env.BASE_URL}images/gallery/football-team.webp`, cap: "Football Team", category: "Sports" },
+    { img: `${import.meta.env.BASE_URL}images/gallery/agriculture.webp`, cap: "Agriculture Club", category: "Clubs" },
+    { img: `${import.meta.env.BASE_URL}images/gallery/readers.webp`, cap: "Reading Time", category: "Academics" },
   ],
 
   contactAddress: "C3F8+QM8, Byumba, Rwanda",
@@ -179,7 +190,13 @@ interface AppContextValue {
 
   // applications
   applications: StudentApplication[];
-  addApplication: (a: StudentApplication) => void;
+  applicationTemplates: { pending: string; approved: string; rejected: string };
+  fetchApplicationTemplates: () => Promise<void>;
+  saveApplicationTemplates: (templates: { pending: string; approved: string; rejected: string }) => Promise<void>;
+  addApplication: (a: StudentApplication) => Promise<StudentApplication>;
+  reviewApplication: (id: number, data: { status: StudentApplication["status"]; feedback: string; feedbackFileData?: string | null; feedbackFileName?: string | null }) => Promise<void>;
+  trackApplication: (value: string) => Promise<StudentApplication>;
+  fetchApplications: (filters?: { from?: string; to?: string }) => Promise<void>;
   deleteApplication: (id: number) => Promise<void>;
 
   // faqs
@@ -202,8 +219,8 @@ interface AppContextValue {
   updateRegistrationSettings: (payload: Partial<RegistrationSettings>) => Promise<void>;
   // Per-photo gallery endpoints — each call touches exactly ONE photo, so
   // saving one photo can never lose or overwrite any of the others.
-  addGalleryPhoto: (photo: { img: string; cap: string }) => Promise<void>;
-  updateGalleryPhoto: (id: number, photo: { img: string; cap: string }) => Promise<void>;
+  addGalleryPhoto: (photo: { img: string; cap: string; category: string }) => Promise<void>;
+  updateGalleryPhoto: (id: number, photo: { img: string; cap: string; category: string }) => Promise<void>;
   deleteGalleryPhoto: (id: number) => Promise<void>;
 
   // page banners (the "card page-banner" header shown at the top of
@@ -259,6 +276,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [teachers, setTeachers] = useState<Teacher[]>(DEFAULT_TEACHERS);
   const [applications, setApplications] = useState<StudentApplication[]>([]);
+  const [applicationTemplates, setApplicationTemplates] = useState({ pending: "", approved: "", rejected: "" });
   const [faqs, setFaqsState] = useState<Faq[]>(DEFAULT_FAQS);
   const [site, setSiteState] = useState<SiteContent>(DEFAULT_SITE);
   const [pageBanners, setPageBanners] = useState<PageBanners>(DEFAULT_PAGE_BANNERS);
@@ -442,12 +460,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // -------------------------------------------------------------- APPLICATIONS --
-  const addApplication = (a: StudentApplication) => {
-    // Fire-and-forget: any visitor can submit one, no login required. The
-    // admin's own applications list is (re)loaded from the server whenever
-    // they open the Admin panel, so it doesn't need this local echo.
-    api.post("/api/applications", a).catch((e) => console.error("Failed to submit application:", e));
+  const addApplication = async (a: StudentApplication) => {
+    const created = await api.post<StudentApplication>("/api/applications", a);
+    setApplications((prev) => [created, ...prev]);
+    return created;
   };
+
+  const fetchApplications = async (filters?: { from?: string; to?: string }) => {
+    const query = new URLSearchParams();
+    if (filters?.from) query.set("from", filters.from);
+    if (filters?.to) query.set("to", filters.to);
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    setApplications(await api.get<StudentApplication[]>(`/api/applications${suffix}`, "admin"));
+  };
+
+  const fetchApplicationTemplates = async () => {
+    setApplicationTemplates(await api.get<{ pending: string; approved: string; rejected: string }>("/api/applications/templates", "admin"));
+  };
+
+  const saveApplicationTemplates = async (templates: { pending: string; approved: string; rejected: string }) => {
+    const saved = await api.put<typeof templates>("/api/applications/templates", templates, "admin");
+    setApplicationTemplates(saved);
+  };
+
+  const reviewApplication = async (id: number, data: { status: StudentApplication["status"]; feedback: string; feedbackFileData?: string | null; feedbackFileName?: string | null }) => {
+    const updated = await api.put<StudentApplication>(`/api/applications/${id}/review`, data, "admin");
+    setApplications((prev) => prev.map((application) => (application.id === id ? updated : application)));
+  };
+
+  const trackApplication = (value: string) => api.get<StudentApplication>(`/api/applications/track/lookup?value=${encodeURIComponent(value)}`);
 
   const deleteApplication = async (id: number) => {
     await api.delete(`/api/applications/${id}`, "admin");
@@ -517,14 +558,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Adds ONE new gallery photo (POST /api/site/gallery). Only appends the
   // returned row to local state — every other photo is left untouched.
-  const addGalleryPhoto = async (photo: { img: string; cap: string }) => {
+  const addGalleryPhoto = async (photo: { img: string; cap: string; category: string }) => {
     const saved = await api.post<GalleryItem>("/api/site/gallery", photo, "admin");
     setSiteState((prev) => ({ ...prev, gallery: [...prev.gallery, saved] }));
   };
 
   // Updates ONE existing gallery photo by id (PUT /api/site/gallery/:id).
   // Only that photo's entry in local state is replaced.
-  const updateGalleryPhoto = async (id: number, photo: { img: string; cap: string }) => {
+  const updateGalleryPhoto = async (id: number, photo: { img: string; cap: string; category: string }) => {
     const saved = await api.put<GalleryItem>(`/api/site/gallery/${id}`, photo, "admin");
     setSiteState((prev) => ({ ...prev, gallery: prev.gallery.map((g) => (g.id === id ? saved : g)) }));
   };
@@ -887,7 +928,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     myReport,
     fetchMyReport,
     applications,
+    applicationTemplates,
+    fetchApplicationTemplates,
+    saveApplicationTemplates,
     addApplication,
+    reviewApplication,
+    trackApplication,
+    fetchApplications,
     deleteApplication,
     faqs,
     setFaqs,

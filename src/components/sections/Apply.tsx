@@ -5,6 +5,7 @@ import { SCHOOL_CLASSES } from "../../constants/academics";
 import FieldError from "../common/FieldError";
 import { required, validateMinLength, validateRwandaPhone, validateOptionalRwandaPhone, isValid } from "../../utils/validation";
 import { useFadeUp } from "../../hooks/useScrollAnimations";
+import { Link } from "react-router-dom";
 
 const WIZ_LABELS = ["Student", "Track", "School", "Parent", "Review"];
 const WIZ_TOTAL = WIZ_LABELS.length;
@@ -18,6 +19,7 @@ interface FormState {
   district: string;
   sector: string;
   parent: string;
+  email: string;
   phone1: string;
   phone2: string;
 }
@@ -31,6 +33,7 @@ const EMPTY_FORM: FormState = {
   district: "",
   sector: "",
   parent: "",
+  email: "",
   phone1: "",
   phone2: "",
 };
@@ -41,6 +44,7 @@ export default function Apply() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [reportFile, setReportFile] = useState<{ name: string; data: string } | null>(null);
   const [toast, setToast] = useState(false);
+  const [submittedId, setSubmittedId] = useState<number | null>(null);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ref = useRef<HTMLElement>(null);
@@ -91,7 +95,7 @@ export default function Apply() {
   };
   const wizBack = (from: number) => goTo(from - 1);
 
-  const submitApplication = () => {
+  const submitApplication = async () => {
     const app: StudentApplication = {
       id: Date.now(),
       name: form.name,
@@ -104,10 +108,23 @@ export default function Apply() {
       district: form.district,
       sector: form.sector,
       parent: form.parent,
+      email: form.email,
       phone1: form.phone1,
       phone2: form.phone2,
+      status: "pending",
+      feedback: "",
+      feedbackFile: null,
+      feedbackFileName: null,
+      createdAt: "",
+      updatedAt: "",
     };
-    addApplication(app);
+    try {
+      const created = await addApplication(app);
+      setSubmittedId(created.id);
+    } catch {
+      setToast(false);
+      return;
+    }
     setForm(EMPTY_FORM);
     setErrors({});
     resetReportTile();
@@ -156,6 +173,9 @@ export default function Apply() {
             Original documents (birth certificate, report card, transfer letter if applicable) should be brought in
             person after your online application is approved.
           </p>
+          <Link to="/track-application" className="apply-track-btn">
+            <i className="fa-solid fa-magnifying-glass" /> Track application
+          </Link>
         </div>
 
         <div className="form-card">
@@ -278,6 +298,10 @@ export default function Apply() {
                   <label>Parent / guardian name</label>
                 </div>
                 <FieldError message={errors.parent} />
+                <div className="full ffield">
+                  <input type="email" placeholder=" " value={form.email} onChange={(e) => update("email", e.target.value)} />
+                  <label>Parent / guardian email (optional)</label>
+                </div>
                 <div className="ffield">
                   <input type="tel" placeholder=" " required value={form.phone1} onChange={(e) => update("phone1", e.target.value)} className={errors.phone1 ? "field-invalid" : ""} />
                   <label>Parent / guardian phone (1)</label>
@@ -315,7 +339,8 @@ export default function Apply() {
             </div>
 
             <div className={`toast-msg ${toast ? "show" : ""}`}>
-              <i className="fa-solid fa-circle-check" /> Application submitted! We'll reach out on the phone number provided.
+              <i className="fa-solid fa-circle-check" /> Application submitted! Your tracking number is <strong>#{submittedId}</strong>. Save it to check your status.
+              <Link to="/track-application">Track application</Link>
             </div>
           </form>
         </div>

@@ -139,13 +139,14 @@ async function ensureSiteContent() {
   }
   await pool.query(
     `INSERT INTO site_content
-      (id, hero_img, hero_main, hero_accent, hero_sub,
+      (id, hero_img, hero_images, hero_main, hero_accent, hero_sub,
        feat1_title, feat1_desc, feat2_title, feat2_desc, feat3_title, feat3_desc,
-       about_img, about_title, about_para1, about_para2,
+       about_img, about_title, about_para1, about_para2, mission, vision, core_values,
        strip_title, strip_desc, contact_address, contact_phone, contact_hours)
-     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       "/images/hero-styled.webp",
+      JSON.stringify(["/images/hero-styled.webp"]),
       "CPEC Saint Babeth",
       "TSS",
       "Located in Byumba, we prepare students in S1–S3 for national excellence while building strong foundations in Software Development, ICT and Multimedia Production.",
@@ -159,6 +160,14 @@ async function ensureSiteContent() {
       "Discipline, Work, Integrity — since day one",
       "CPEC Saint Babeth TSS is based in Byumba, Rwanda, offering lower secondary education (S1–S3) alongside specialised technology training. Our mission is to nurture disciplined, skilled and principled young people ready for the modern world.",
       "Guided by our motto — Discipline, Work, Integrity — we combine strong academic fundamentals with practical Software Development, ICT and Multimedia Production skills that open doors beyond the classroom.",
+      "To provide a nurturing and disciplined learning environment where students grow academically, technically and personally through excellence in teaching, mentorship and character development.",
+      "To become a leading technical secondary school in Rwanda that produces confident, skilled and responsible graduates ready to contribute to society and the digital economy.",
+      JSON.stringify([
+        "Discipline and accountability",
+        "Hard work and excellence",
+        "Integrity and respect",
+        "Innovation and practical learning",
+      ]),
       "Technology & Media Track",
       "Hands-on classes designed to give students real, practical digital skills alongside their core curriculum.",
       "C3F8+QM8, Byumba, Rwanda",
@@ -179,28 +188,41 @@ async function ensureSiteContent() {
   }
 
   const programs = [
-    ["Senior 1 (S1)", "Foundational subjects in mathematics, sciences, languages and general studies, building strong learning habits from the start."],
-    ["Senior 2 (S2)", "Deeper subject exploration with continued focus on discipline, teamwork and academic performance."],
-    ["Senior 3 (S3)", "Consolidation year preparing students for national exams and future specialisation choices."],
+    ["Ordinary Level", "Senior 1 (S1)", "Foundational subjects in mathematics, sciences, languages and general studies, building strong learning habits from the start."],
+    ["Ordinary Level", "Senior 2 (S2)", "Deeper subject exploration with continued focus on discipline, teamwork and academic performance."],
+    ["Ordinary Level", "Senior 3 (S3)", "Consolidation year preparing students for national exams and future specialisation choices."],
   ];
   order = 0;
-  for (const [title, description] of programs) {
-    await pool.query("INSERT INTO programs (site_content_id, title, description, sort_order) VALUES (1, ?, ?, ?)", [title, description, order++]);
+  for (const [section, title, description] of programs) {
+    await pool.query(
+      "INSERT INTO programs (site_content_id, title, description, section, sort_order) VALUES (1, ?, ?, ?, ?)",
+      [title, description, section, order++]
+    );
   }
 
   const gallery = [
-    ["/images/gallery/school-gate.webp", "School Gate"],
-    ["/images/gallery/football-team.webp", "Football Team"],
-    ["/images/gallery/agriculture.webp", "Agriculture Club"],
-    ["/images/gallery/readers.webp", "Reading Time"],
-    ["/images/gallery/head-teachers.webp", "Our Staff"],
+    ["/images/gallery/school-gate.webp", "School Gate", "Campus"],
+    ["/images/gallery/football-team.webp", "Football Team", "Sports"],
+    ["/images/gallery/agriculture.webp", "Agriculture Club", "Clubs"],
+    ["/images/gallery/readers.webp", "Reading Time", "Academics"],
+    ["/images/gallery/head-teachers.webp", "Our Staff", "Team"],
   ];
   order = 0;
-  for (const [imageUrl, caption] of gallery) {
-    await pool.query("INSERT INTO gallery_items (site_content_id, image_url, caption, sort_order) VALUES (1, ?, ?, ?)", [imageUrl, caption, order++]);
+  for (const [imageUrl, caption, category] of gallery) {
+    await pool.query("INSERT INTO gallery_items (site_content_id, image_url, caption, category, sort_order) VALUES (1, ?, ?, ?, ?)", [imageUrl, caption, category, order++]);
   }
 
   console.log("✔ Added default site content, about points, programs & gallery items.");
+
+  await pool.query(
+    `INSERT IGNORE INTO application_feedback_templates (id, pending_message, approved_message, rejected_message)
+     VALUES (1, ?, ?, ?)`,
+    [
+      "Your application has been received and is waiting for review.",
+      "Congratulations. Your application has been approved. Please contact the school for the next steps.",
+      "Thank you for applying. Unfortunately, we cannot offer a place at this time because available places are full.",
+    ]
+  );
 }
 
 async function ensurePageBanners() {

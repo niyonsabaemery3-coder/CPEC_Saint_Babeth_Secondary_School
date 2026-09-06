@@ -12,6 +12,11 @@
     "db:seed": "node src/scripts/seed.js",
     "db:migrate-classes": "node src/scripts/migrateSchoolClasses.js",
     "db:migrate-registration": "node src/scripts/migrateRegistration.js",
+    "db:migrate-about": "node src/scripts/migrateAbout.js",
+    "db:migrate-gallery": "node src/scripts/migrateGallery.js",
+    "db:migrate-hero": "node src/scripts/migrateHero.js",
+    "db:migrate-applications": "node src/scripts/migrateApplications.js",
+    "db:migrate-application-templates": "node src/scripts/migrateApplicationTemplates.js",
     "storage:cleanup": "node src/scripts/cleanupOrphanedFiles.js"
   },
   "dependencies": {

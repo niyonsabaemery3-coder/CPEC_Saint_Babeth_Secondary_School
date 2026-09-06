@@ -8,18 +8,22 @@ export default function DashboardView() {
     <div className="admin-panel-view active">
       <div className="stat-grid">
         <div className="stat-card">
+          <span className="stat-card-icon" aria-hidden="true"><i className="fa-solid fa-file-lines" /></span>
           <div className="num">{applications.length}</div>
           <div className="lbl">Applications received</div>
         </div>
         <div className="stat-card">
+          <span className="stat-card-icon" aria-hidden="true"><i className="fa-solid fa-users" /></span>
           <div className="num">{teachers.length}</div>
           <div className="lbl">Teachers listed</div>
         </div>
         <div className="stat-card">
+          <span className="stat-card-icon" aria-hidden="true"><i className="fa-solid fa-book-open" /></span>
           <div className="num">{resources.length}</div>
           <div className="lbl">Resources published</div>
         </div>
         <div className="stat-card">
+          <span className="stat-card-icon" aria-hidden="true"><i className="fa-solid fa-user-gear" /></span>
           <div className="num">{teacherAccounts.length}</div>
           <div className="lbl">Teacher accounts</div>
         </div>

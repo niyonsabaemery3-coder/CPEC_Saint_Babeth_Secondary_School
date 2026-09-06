@@ -25,8 +25,15 @@ export interface StudentApplication {
   district: string;
   sector: string;
   parent: string;
+  email: string;
   phone1: string;
   phone2: string;
+  status: "pending" | "approved" | "rejected";
+  feedback: string;
+  feedbackFile: string | null;
+  feedbackFileName: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Faq {
@@ -36,6 +43,7 @@ export interface Faq {
 }
 
 export interface ProgramCard {
+  section: string;
   title: string;
   desc: string;
 }
@@ -44,10 +52,12 @@ export interface GalleryItem {
   id?: number; // present once saved to the server; absent for a newly-added, unsaved photo
   img: string;
   cap: string;
+  category: string;
 }
 
 export interface SiteContent {
   heroImg: string;
+  heroImages: string[];
   heroMain: string;
   heroAccent: string;
   heroSub: string;
@@ -62,7 +72,10 @@ export interface SiteContent {
   aboutTitle: string;
   aboutPara1: string;
   aboutPara2: string;
-  aboutLi: [string, string, string, string];
+  mission: string;
+  vision: string;
+  coreValues: string[];
+  aboutLi: string[];
 
   programs: [ProgramCard, ProgramCard, ProgramCard];
   stripTitle: string;

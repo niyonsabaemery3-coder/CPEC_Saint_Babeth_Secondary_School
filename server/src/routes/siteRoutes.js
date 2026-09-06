@@ -32,11 +32,29 @@ async function assembleSiteContent(req) {
   const [[site]] = await pool.query("SELECT * FROM site_content WHERE id = 1");
   if (!site) return null;
   const [aboutPoints] = await pool.query("SELECT text FROM about_points WHERE site_content_id = 1 ORDER BY sort_order ASC");
-  const [programs] = await pool.query("SELECT title, description FROM programs WHERE site_content_id = 1 ORDER BY sort_order ASC");
-  const [gallery] = await pool.query("SELECT id, image_url, caption FROM gallery_items WHERE site_content_id = 1 ORDER BY sort_order ASC");
+  const [programs] = await pool.query("SELECT title, description, section FROM programs WHERE site_content_id = 1 ORDER BY sort_order ASC");
+  const [gallery] = await pool.query("SELECT id, image_url, caption, category FROM gallery_items WHERE site_content_id = 1 ORDER BY sort_order ASC");
+
+  let heroImages = [];
+  try {
+    const parsedHeroImages = JSON.parse(site.hero_images || "[]");
+    heroImages = Array.isArray(parsedHeroImages) ? parsedHeroImages.filter((image) => typeof image === "string" && image.trim()) : [];
+  } catch {
+    heroImages = [];
+  }
+  if (heroImages.length === 0 && site.hero_img) heroImages = [site.hero_img];
+
+  let coreValues = [];
+  try {
+    const parsed = JSON.parse(site.core_values || "[]");
+    coreValues = Array.isArray(parsed) ? parsed.filter((value) => typeof value === "string").map((value) => value.trim()).filter(Boolean) : [];
+  } catch {
+    coreValues = [];
+  }
 
   return {
     heroImg: toAbsoluteUploadUrl(req, site.hero_img),
+    heroImages: heroImages.map((image) => toAbsoluteUploadUrl(req, image)),
     heroMain: site.hero_main,
     heroAccent: site.hero_accent,
     heroSub: site.hero_sub,
@@ -50,11 +68,18 @@ async function assembleSiteContent(req) {
     aboutTitle: site.about_title,
     aboutPara1: site.about_para1,
     aboutPara2: site.about_para2,
+    mission: site.mission || "",
+    vision: site.vision || "",
+    coreValues,
     aboutLi: aboutPoints.map((p) => p.text),
-    programs: programs.map((p) => ({ title: p.title, desc: p.description })),
+    programs: programs.map((p) => ({
+      section: p.section?.trim() || "Ordinary Level",
+      title: p.title,
+      desc: p.description,
+    })),
     stripTitle: site.strip_title,
     stripDesc: site.strip_desc,
-    gallery: gallery.map((g) => ({ id: g.id, img: toAbsoluteUploadUrl(req, g.image_url), cap: g.caption })),
+    gallery: gallery.map((g) => ({ id: g.id, img: toAbsoluteUploadUrl(req, g.image_url), cap: g.caption, category: g.category || "General" })),
     contactAddress: site.contact_address,
     contactPhone: site.contact_phone,
     contactHours: site.contact_hours,
@@ -90,19 +115,24 @@ router.put("/home", requireAdmin, async (req, res, next) => {
     await ensureSiteRow();
     const b = req.body || {};
 
-    const [[existing]] = await pool.query("SELECT hero_img FROM site_content WHERE id = 1");
+    const [[existing]] = await pool.query("SELECT hero_img, hero_images FROM site_content WHERE id = 1");
     const oldHeroImg = existing?.hero_img || null;
 
-    const heroImg = b.heroImg?.startsWith("data:")
-      ? await saveBase64File(b.heroImg, "images")
-      : toRelativeUploadPath(b.heroImg);
+    const requestedImages = Array.isArray(b.heroImages) ? b.heroImages : [b.heroImg];
+    const heroImages = [];
+    for (const image of requestedImages) {
+      if (typeof image !== "string" || !image.trim()) continue;
+      heroImages.push(image.startsWith("data:") ? await saveBase64File(image, "images") : toRelativeUploadPath(image));
+    }
+    const savedHeroImages = heroImages.length ? heroImages : [toRelativeUploadPath(b.heroImg)];
+    const heroImg = savedHeroImages[0];
 
     await pool.query(
       `UPDATE site_content SET
-        hero_img = ?, hero_main = ?, hero_accent = ?, hero_sub = ?,
+        hero_img = ?, hero_images = ?, hero_main = ?, hero_accent = ?, hero_sub = ?,
         feat1_title = ?, feat1_desc = ?, feat2_title = ?, feat2_desc = ?, feat3_title = ?, feat3_desc = ?
        WHERE id = 1`,
-      [heroImg, b.heroMain, b.heroAccent, b.heroSub, b.feat1Title, b.feat1Desc, b.feat2Title, b.feat2Desc, b.feat3Title, b.feat3Desc]
+      [heroImg, JSON.stringify(savedHeroImages), b.heroMain, b.heroAccent, b.heroSub, b.feat1Title, b.feat1Desc, b.feat2Title, b.feat2Desc, b.feat3Title, b.feat3Desc]
     );
 
     if (heroImg !== oldHeroImg && oldHeroImg) await deleteUploadedFile(oldHeroImg).catch(() => {});
@@ -130,13 +160,20 @@ router.put("/about", requireAdmin, async (req, res, next) => {
       ? await saveBase64File(b.aboutImg, "images")
       : toRelativeUploadPath(b.aboutImg);
 
+    const coreValues = Array.isArray(b.coreValues)
+      ? b.coreValues.map((value) => String(value).trim()).filter(Boolean)
+      : [];
+
     await conn.query(
-      `UPDATE site_content SET about_img = ?, about_title = ?, about_para1 = ?, about_para2 = ? WHERE id = 1`,
-      [aboutImg, b.aboutTitle, b.aboutPara1, b.aboutPara2]
+      `UPDATE site_content SET about_img = ?, about_title = ?, about_para1 = ?, about_para2 = ?, mission = ?, vision = ?, core_values = ? WHERE id = 1`,
+      [aboutImg, b.aboutTitle, b.aboutPara1, b.aboutPara2, b.mission || "", b.vision || "", JSON.stringify(coreValues)]
     );
 
     await conn.query("DELETE FROM about_points WHERE site_content_id = 1");
-    for (const [i, text] of (b.aboutLi || []).entries()) {
+    const aboutHighlights = Array.isArray(b.aboutLi)
+      ? b.aboutLi.map((text) => String(text).trim()).filter(Boolean)
+      : [];
+    for (const [i, text] of aboutHighlights.entries()) {
       await conn.query("INSERT INTO about_points (site_content_id, text, sort_order) VALUES (1, ?, ?)", [text, i]);
     }
 
@@ -164,7 +201,11 @@ router.put("/academics", requireAdmin, async (req, res, next) => {
 
     await conn.query("DELETE FROM programs WHERE site_content_id = 1");
     for (const [i, p] of (b.programs || []).entries()) {
-      await conn.query("INSERT INTO programs (site_content_id, title, description, sort_order) VALUES (1, ?, ?, ?)", [p.title, p.desc, i]);
+      const section = typeof p.section === "string" && p.section.trim() ? p.section.trim() : "Ordinary Level";
+      await conn.query(
+        "INSERT INTO programs (site_content_id, title, description, section, sort_order) VALUES (1, ?, ?, ?, ?)",
+        [p.title, p.desc, section, i]
+      );
     }
 
     await conn.commit();
@@ -183,28 +224,29 @@ router.put("/academics", requireAdmin, async (req, res, next) => {
 // other photo, so it is now impossible to "forget" or lose photos that
 // weren't part of the save you just clicked.
 
-// Add a brand-new photo. Body: { img, cap }.
+// Add a brand-new photo. Body: { img, cap, category }.
 router.post("/gallery", requireAdmin, async (req, res, next) => {
   try {
     await ensureSiteRow();
     const b = req.body || {};
     const imageUrl = b.img?.startsWith("data:") ? await saveBase64File(b.img, "images") : toRelativeUploadPath(b.img);
+    const category = typeof b.category === "string" && b.category.trim() ? b.category.trim() : "General";
 
     const [[{ maxOrder }]] = await pool.query(
       "SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM gallery_items WHERE site_content_id = 1"
     );
     const [result] = await pool.query(
-      "INSERT INTO gallery_items (site_content_id, image_url, caption, sort_order) VALUES (1, ?, ?, ?)",
-      [imageUrl, b.cap || "", maxOrder + 1]
+      "INSERT INTO gallery_items (site_content_id, image_url, caption, category, sort_order) VALUES (1, ?, ?, ?, ?)",
+      [imageUrl, b.cap || "", category, maxOrder + 1]
     );
 
-    res.json({ id: result.insertId, img: toAbsoluteUploadUrl(req, imageUrl), cap: b.cap || "" });
+    res.json({ id: result.insertId, img: toAbsoluteUploadUrl(req, imageUrl), cap: b.cap || "", category });
   } catch (err) {
     next(err);
   }
 });
 
-// Update ONE existing photo by id. Body: { img, cap }. Never touches any
+// Update ONE existing photo by id. Body: { img, cap, category }. Never touches any
 // other gallery_items row.
 router.put("/gallery/:id", requireAdmin, async (req, res, next) => {
   try {
@@ -214,12 +256,13 @@ router.put("/gallery/:id", requireAdmin, async (req, res, next) => {
 
     const b = req.body || {};
     const imageUrl = b.img?.startsWith("data:") ? await saveBase64File(b.img, "images") : toRelativeUploadPath(b.img);
+    const category = typeof b.category === "string" && b.category.trim() ? b.category.trim() : "General";
 
-    await pool.query("UPDATE gallery_items SET image_url = ?, caption = ? WHERE id = ?", [imageUrl, b.cap || "", id]);
+    await pool.query("UPDATE gallery_items SET image_url = ?, caption = ?, category = ? WHERE id = ?", [imageUrl, b.cap || "", category, id]);
 
     if (imageUrl !== existing.image_url && existing.image_url) await deleteUploadedFile(existing.image_url).catch(() => {});
 
-    res.json({ id, img: toAbsoluteUploadUrl(req, imageUrl), cap: b.cap || "" });
+    res.json({ id, img: toAbsoluteUploadUrl(req, imageUrl), cap: b.cap || "", category });
   } catch (err) {
     next(err);
   }

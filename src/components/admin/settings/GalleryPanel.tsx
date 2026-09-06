@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../../../context/AppContext";
 import type { GalleryItem } from "../../../types";
 import FField from "./FField";
 import ImgTile from "./ImgTile";
 import SettingsMsg from "./SettingsMsg";
 
-const BLANK_PHOTO: GalleryItem = { img: "", cap: "" };
+const BLANK_PHOTO: GalleryItem = { img: "", cap: "", category: "General" };
 
-interface RowStatus {
+interface PhotoStatus {
   saving: boolean;
   saved: boolean;
   error: string | null;
@@ -16,108 +16,187 @@ interface RowStatus {
 export default function GalleryPanel() {
   const { site, addGalleryPhoto, updateGalleryPhoto, deleteGalleryPhoto } = useApp();
   const [draft, setDraft] = useState<GalleryItem[]>(site.gallery);
-  // Save/error state per row, keyed by its position in the list — each
-  // photo's Save button only ever affects that one row's status.
-  const [statuses, setStatuses] = useState<Record<number, RowStatus>>({});
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const [categoryDraft, setCategoryDraft] = useState("");
+  const [statuses, setStatuses] = useState<Record<string, PhotoStatus>>({});
 
-  useEffect(() => setDraft(site.gallery), [site.gallery]);
+  useEffect(() => {
+    setDraft(site.gallery.map((photo) => ({ ...photo, category: photo.category || "General" })));
+  }, [site.gallery]);
 
-  const setItem = (index: number, key: "img" | "cap", value: string) => {
-    setDraft((d) => d.map((g, i) => (i === index ? { ...g, [key]: value } : g)));
-    setStatuses((s) => ({ ...s, [index]: { saving: false, saved: false, error: null } }));
+  const groups = useMemo(() => {
+    const grouped = new Map<string, GalleryItem[]>();
+    draft.forEach((photo) => {
+      const category = photo.category.trim() || "General";
+      grouped.set(category, [...(grouped.get(category) || []), photo]);
+    });
+    return Array.from(grouped.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [draft]);
+
+  const activePhotos = selectedCategory
+    ? draft.filter((photo) => (photo.category.trim() || "General") === selectedCategory)
+    : [];
+  const activePhoto = activePhotos[photoIndex];
+  const activeKey = activePhoto ? String(activePhoto.id ?? `${selectedCategory}-${photoIndex}`) : "";
+  const activeStatus = statuses[activeKey];
+
+  useEffect(() => {
+    setCategoryDraft(activePhoto?.category || selectedCategory || "General");
+  }, [activePhoto?.id, selectedCategory, photoIndex]);
+
+  const setStatus = (key: string, patch: Partial<PhotoStatus>) => {
+    setStatuses((current) => ({
+      ...current,
+      [key]: { ...{ saving: false, saved: false, error: null }, ...current[key], ...patch },
+    }));
   };
 
-  const setRowStatus = (index: number, patch: Partial<RowStatus>) => {
-    setStatuses((s) => ({ ...s, [index]: { ...s[index], ...patch } }));
+  const setPhoto = (photo: GalleryItem, updates: Partial<GalleryItem>) => {
+    if (updates.category !== undefined) return;
+    setDraft((current) => current.map((item) => (item === photo ? { ...item, ...updates } : item)));
+    setStatus(String(photo.id ?? `${selectedCategory}-${photoIndex}`), { saved: false, error: null });
+  };
+
+  const openCategory = (category: string) => {
+    setSelectedCategory(category);
+    setPhotoIndex(0);
   };
 
   const addPhoto = () => {
-    setDraft((d) => [...d, { ...BLANK_PHOTO }]);
+    const category = selectedCategory || "General";
+    const existingCount = draft.filter((photo) => (photo.category || "General") === category).length;
+    setDraft((current) => [...current, { ...BLANK_PHOTO, category }]);
+    setSelectedCategory(category);
+    setPhotoIndex(existingCount);
   };
 
-  // Saves ONLY this one photo — POST if it's new (no id yet), PUT if it
-  // already exists. Every other photo on screen, saved or not, is left
-  // completely untouched by this call.
-  const savePhoto = async (index: number) => {
-    const photo = draft[index];
-    if (!photo.img) {
-      setRowStatus(index, { error: "Add a photo before saving.", saved: false });
+  const savePhoto = async () => {
+    if (!activePhoto) return;
+    const key = activeKey;
+    if (!activePhoto.img) {
+      setStatus(key, { error: "Choose a photo before saving." });
       return;
     }
-    setRowStatus(index, { saving: true, error: null, saved: false });
+    const category = categoryDraft.trim() || "General";
+    setStatus(key, { saving: true, error: null, saved: false });
     try {
-      if (photo.id) {
-        await updateGalleryPhoto(photo.id, { img: photo.img, cap: photo.cap });
+      if (activePhoto.id) {
+        await updateGalleryPhoto(activePhoto.id, { img: activePhoto.img, cap: activePhoto.cap, category });
       } else {
-        await addGalleryPhoto({ img: photo.img, cap: photo.cap });
+        await addGalleryPhoto({ img: activePhoto.img, cap: activePhoto.cap, category });
       }
-      setRowStatus(index, { saving: false, saved: true });
+      setDraft((current) => current.map((item) => (item === activePhoto ? { ...item, category } : item)));
+      setSelectedCategory(category);
+      setPhotoIndex(0);
+      setStatus(key, { saving: false, saved: true, error: null });
     } catch {
-      setRowStatus(index, { saving: false, error: "Failed to save. Please try again." });
+      setStatus(key, { saving: false, error: "Failed to save this photo. Please try again." });
     }
   };
 
-  // Removes ONLY this one photo. If it was already saved, this deletes just
-  // that row on the server (DELETE /api/site/gallery/:id) — no other photo
-  // is affected. If it was never saved yet, it's simply dropped locally.
-  const removePhoto = async (index: number) => {
-    if (draft.length <= 1) return; // always keep at least one photo
-    const photo = draft[index];
-    if (photo.id) {
-      if (!confirm("Remove this photo? This cannot be undone.")) return;
-      setRowStatus(index, { saving: true, error: null });
-      try {
-        await deleteGalleryPhoto(photo.id);
-      } catch {
-        setRowStatus(index, { saving: false, error: "Failed to remove. Please try again." });
-      }
-    } else {
-      setDraft((d) => d.filter((_, i) => i !== index));
+  const removePhoto = async () => {
+    if (!activePhoto || !confirm("Remove this photo? This cannot be undone.")) return;
+    const key = activeKey;
+    setStatus(key, { saving: true, error: null });
+    try {
+      if (activePhoto.id) await deleteGalleryPhoto(activePhoto.id);
+      setDraft((current) => current.filter((item) => item !== activePhoto));
+      setPhotoIndex((current) => Math.max(0, Math.min(current, activePhotos.length - 2)));
+    } catch {
+      setStatus(key, { saving: false, error: "Failed to delete this photo. Please try again." });
     }
   };
 
   return (
     <>
-      <h3>Gallery</h3>
-      <p className="sp-sub">
-        Each photo has its own Save button — add or update one photo at a time without affecting the others. If you
-        add a new photo slot and forget to choose an image, only that photo's save will be blocked; everything else
-        stays exactly as it was. Once you have more than 5 photos, visitors will see left/right arrows on the public
-        site to page through them.
-      </p>
+      <div className="gallery-admin-heading">
+        <div>
+          <h3>Gallery</h3>
+          <p className="sp-sub">Organise large photo collections by category. Open a category to review, edit, add or delete photos one at a time.</p>
+        </div>
+        <button type="button" className="a-add-btn" onClick={addPhoto}>
+          <i className="fa-solid fa-plus" /> Add photo
+        </button>
+      </div>
 
-      {draft.map((g, i) => {
-        const st = statuses[i];
-        return (
-          <div className="sp-block" key={g.id ?? `new-${i}`}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <h5 style={{ margin: 0 }}>Photo {i + 1}</h5>
-              <button
-                type="button"
-                className="a-del-btn"
-                onClick={() => removePhoto(i)}
-                disabled={draft.length <= 1 || st?.saving}
-                title="Remove this photo"
-              >
-                <i className="fa-solid fa-trash" />
+      {!selectedCategory && (
+        <>
+          <div className="gallery-admin-overview-head">
+            <div><strong>{draft.length}</strong> photos in <strong>{groups.length}</strong> categories</div>
+            <span>Select a category to manage its collection</span>
+          </div>
+          <div className="gallery-category-grid">
+            {groups.map(([category, photos]) => (
+              <button type="button" className="gallery-category-card" key={category} onClick={() => openCategory(category)}>
+                <span className="gallery-category-cover" style={{ backgroundImage: `url('${photos[0]?.img || ""}')` }}>
+                  <span className="gallery-category-count">{photos.length} {photos.length === 1 ? "photo" : "photos"}</span>
+                </span>
+                <span className="gallery-category-meta">
+                  <strong>{category}</strong>
+                  <span>Manage collection <i className="fa-solid fa-arrow-right" /></span>
+                </span>
               </button>
-            </div>
-            <ImgTile src={g.img} onChange={(v) => setItem(i, "img", v)} />
-            <FField label="Caption" value={g.cap} onChange={(v) => setItem(i, "cap", v)} />
+            ))}
+            {groups.length === 0 && <div className="gallery-empty-state"><i className="fa-regular fa-images" /><strong>No photos yet</strong><span>Add your first photo to create a collection.</span></div>}
+          </div>
+        </>
+      )}
 
-            <SettingsMsg text={st?.error || "Photo saved."} type={st?.error ? "err" : st?.saved ? "ok" : null} />
-            <div className="sp-save-row">
-              <button className="a-add-btn" onClick={() => savePhoto(i)} disabled={st?.saving}>
-                <i className="fa-solid fa-check" /> {st?.saving ? "Saving..." : "Save photo"}
+      {selectedCategory && activePhoto && (
+        <div className="gallery-admin-editor">
+          <div className="gallery-admin-editor-head">
+            <button type="button" className="btn-ghost gallery-back-btn" onClick={() => setSelectedCategory(null)}>
+              <i className="fa-solid fa-arrow-left" /> All categories
+            </button>
+            <div>
+              <span className="gallery-admin-kicker">Category collection</span>
+              <h4>{selectedCategory}</h4>
+              <span>{photoIndex + 1} of {activePhotos.length} photos</span>
+            </div>
+            <button type="button" className="a-del-btn" onClick={removePhoto} disabled={activeStatus?.saving} title="Delete photo">
+              <i className="fa-solid fa-trash" /> Delete
+            </button>
+          </div>
+
+          <div className="gallery-admin-editor-body">
+            <div className="gallery-admin-editor-photo">
+              <ImgTile src={activePhoto.img} onChange={(img) => setPhoto(activePhoto, { img })} />
+              <div className="gallery-admin-stepper">
+                <button type="button" onClick={() => setPhotoIndex((current) => (current - 1 + activePhotos.length) % activePhotos.length)} aria-label="Previous photo">
+                  <i className="fa-solid fa-chevron-left" />
+                </button>
+                <span>{photoIndex + 1} / {activePhotos.length}</span>
+                <button type="button" onClick={() => setPhotoIndex((current) => (current + 1) % activePhotos.length)} aria-label="Next photo">
+                  <i className="fa-solid fa-chevron-right" />
+                </button>
+              </div>
+            </div>
+            <div className="gallery-admin-editor-fields">
+              <div className="gallery-admin-field-title">Photo details</div>
+              <FField label="Caption" value={activePhoto.cap} onChange={(cap) => setPhoto(activePhoto, { cap })} />
+              <FField label="Category" value={categoryDraft} onChange={(category) => { setCategoryDraft(category); setStatus(activeKey, { saved: false, error: null }); }} />
+              <SettingsMsg text={activeStatus?.error || (activeStatus?.saved ? "Photo saved successfully." : "Changes are ready to save.")} type={activeStatus?.error ? "err" : activeStatus?.saved ? "ok" : null} />
+              <button type="button" className="a-add-btn gallery-save-btn" onClick={savePhoto} disabled={activeStatus?.saving}>
+                <i className="fa-solid fa-check" /> {activeStatus?.saving ? "Saving..." : "Save photo"}
               </button>
             </div>
           </div>
-        );
-      })}
 
-      <button type="button" className="btn-ghost" style={{ marginBottom: "18px" }} onClick={addPhoto}>
-        <i className="fa-solid fa-plus" /> Add Photo
-      </button>
+          <div className="gallery-admin-thumbnails" aria-label={`${selectedCategory} photos`}>
+            {activePhotos.map((photo, index) => (
+              <button type="button" key={photo.id ?? `new-${index}`} className={index === photoIndex ? "active" : ""} onClick={() => setPhotoIndex(index)}>
+                <img src={photo.img} alt={photo.cap || `Photo ${index + 1}`} />
+                <span>{index + 1}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {selectedCategory && !activePhoto && (
+        <div className="gallery-empty-state"><i className="fa-regular fa-images" /><strong>This category is empty</strong><span>Add a photo to this collection.</span><button type="button" className="a-add-btn" onClick={addPhoto}><i className="fa-solid fa-plus" /> Add photo</button></div>
+      )}
     </>
   );
 }

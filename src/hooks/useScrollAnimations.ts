@@ -75,3 +75,64 @@ export function useFadeUp(ref: React.RefObject<HTMLElement | null>, startY = 24)
     return () => io.disconnect();
   }, [ref, startY]);
 }
+
+/** Counts a numeric value from 0 to its final target when the element enters view. */
+export function useCountUp(ref: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const root = ref.current;
+    if (!root || REDUCED_MOTION) return;
+
+    const elements = root.querySelectorAll<HTMLElement>(".feature-value");
+    if (!elements.length) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+
+          const el = entry.target as HTMLElement;
+          const finalValue = Number(el.dataset.count ?? el.textContent ?? "0");
+          if (!Number.isFinite(finalValue)) return;
+
+          const isCompact = el.dataset.format === "compact";
+          const formatValue = (value: number) => {
+            if (!isCompact || value < 1000) return String(value);
+            const compact = value / 1000;
+            return compact >= 100 ? `${Math.round(compact)}K` : `${compact.toFixed(1).replace(/\.0$/, "")}K`;
+          };
+
+          const startValue = 0;
+          const duration = 1200;
+          const startTime = performance.now();
+
+          const tick = (now: number) => {
+            const progress = Math.min((now - startTime) / duration, 1);
+            const eased = 1 - (1 - progress) ** 3;
+            const current = Math.round(startValue + (finalValue - startValue) * eased);
+            el.textContent = formatValue(current);
+
+            if (progress < 1) {
+              requestAnimationFrame(tick);
+            } else {
+              el.textContent = formatValue(finalValue);
+            }
+          };
+
+          requestAnimationFrame(tick);
+          io.unobserve(el);
+        });
+      },
+      { threshold: 0.35 }
+    );
+
+    elements.forEach((el) => {
+      const finalValue = Number(el.dataset.count ?? el.textContent ?? "0");
+      if (!Number.isFinite(finalValue)) return;
+      el.textContent = "0";
+      el.setAttribute("data-count", String(finalValue));
+      io.observe(el);
+    });
+
+    return () => io.disconnect();
+  }, [ref]);
+}

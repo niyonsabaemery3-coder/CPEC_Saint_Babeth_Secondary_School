@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useApp } from "../../context/AppContext";
-import { formatEventDateParts, formatNewsDate } from "../../utils/format";
+import { formatNewsDate } from "../../utils/format";
+import EventCard from "../common/EventCard";
 import type { EventColorKey } from "../../types";
 
 const EVENT_COLORS: Record<EventColorKey, string> = {
@@ -14,7 +15,7 @@ const NEWS_COLORS: Record<string, string> = {
 export default function HomeEventsTeaser() {
   const { eventItems, newsItems } = useApp();
   const [tab, setTab] = useState<"events" | "news">("events");
-  const events = eventItems.slice(0, 3);
+  const events = eventItems.slice(0, 4);
   const news = newsItems.slice(0, 2);
 
   return (
@@ -37,23 +38,15 @@ export default function HomeEventsTeaser() {
       <div className="en-panel home-en-panel">
         {tab === "events" ? (
           events.length === 0 ? <p className="a-empty">No upcoming events right now.</p> :
-          <div className="en-events-grid home-en-events-grid">
-            {events.map((event) => {
-              const { month, day, year } = formatEventDateParts(event.date);
-              return (
-                <Link to="/events-news" className="en-ev-card home-en-event-card" key={event.id}>
-                  <div className="en-ev-header" style={{ background: event.image ? `linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.45)), url('${event.image}')` : EVENT_COLORS[event.colorKey], backgroundSize: "cover", backgroundPosition: "center" }}>
-                    <div className="en-ev-date-box"><span className="en-ev-month">{month}</span><span className="en-ev-day">{day}</span><span className="en-ev-year">{year}</span></div>
-                    <div className="en-ev-icon-wrap"><i className={`fa-solid ${event.icon} en-ev-icon`} /></div>
-                  </div>
-                  <div className="en-ev-body home-en-event-body">
-                    <div className="en-ev-body-fixed"><span className="en-ev-category" style={{ color: EVENT_COLORS[event.colorKey], borderColor: EVENT_COLORS[event.colorKey] }}>{event.category}</span><h3 className="en-ev-title">{event.title}</h3></div>
-                    <div className="en-ev-desc-wrap home-en-event-desc-wrap"><p className="en-ev-desc">{event.description}</p></div>
-                  </div>
-                  <div className="en-ev-footer home-en-event-footer"><span className="en-ev-footer-item"><i className="fa-regular fa-clock" /> {event.time || "See event details"}</span><span className="en-ev-footer-item"><i className="fa-solid fa-location-dot" /> {event.location}</span></div>
-                </Link>
-              );
-            })}
+          <div className="en-events-grid event-card-grid home-en-events-grid">
+            {events.map((event) => (
+              <EventCard
+                key={event.id}
+                event={event}
+                color={EVENT_COLORS[event.colorKey]}
+                interactive
+              />
+            ))}
           </div>
         ) : (
           news.length === 0 ? <p className="a-empty">No news posted yet.</p> :

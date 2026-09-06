@@ -17,6 +17,7 @@ const EventsNewsPage = lazy(() => import("./pages/EventsNewsPage"));
 const GalleryPage = lazy(() => import("./pages/GalleryPage"));
 const ResourcesPage = lazy(() => import("./pages/ResourcesPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
+const TrackApplicationPage = lazy(() => import("./pages/TrackApplicationPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
 export default function App() {
@@ -42,6 +43,7 @@ export default function App() {
             <Route path="gallery" element={<GalleryPage />} />
             <Route path="resources" element={<ResourcesPage />} />
             <Route path="contact" element={<ContactPage />} />
+            <Route path="track-application" element={<TrackApplicationPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>

@@ -28,7 +28,7 @@ export default function Academics({ teaser = false }: AcademicsProps) {
       <div className="prog-grid">
         {site.programs.map((p, i) => (
           <div className="prog-card" key={i}>
-            <span className="tag">Ordinary Level</span>
+            <span className="tag">{p.section || "Ordinary Level"}</span>
             <h3>{p.title}</h3>
             <p>{p.desc}</p>
           </div>
