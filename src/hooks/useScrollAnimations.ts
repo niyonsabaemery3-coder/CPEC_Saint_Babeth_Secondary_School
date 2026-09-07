@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 // Lightweight, dependency-free replacement for the previous GSAP + ScrollTrigger
 // powered animations. Same visual result (a short fade/translate reveal on
@@ -15,33 +15,94 @@ const REDUCED_MOTION =
 
 const EASE = "cubic-bezier(0.16, 0.84, 0.44, 1)"; // close match for gsap's "power2.out"
 
-/** Reveals `text` one character at a time inside `ref`, e.g. for a hero title. */
-export function useStaggerText(ref: React.RefObject<HTMLElement | null>, text: string, className = "") {
+/**
+ * Reveals characters one at a time inside `ref`, e.g. for a hero title.
+ *
+ * `mainText`   — rendered in normal ink color (no extra class).
+ * `accentText` — rendered with the `accent` class so the CSS rule
+ *                `h1.hero-title .accent { color: var(--gold) }` can apply.
+ *
+ * A double-fire guard (`lastAnimatedRef`) prevents the animation from
+ * replaying when the parent component re-renders with the same text values
+ * (e.g. after an async AppContext update that keeps heroMain/heroAccent
+ * identical).
+ */
+export function useStaggerText(
+  ref: React.RefObject<HTMLElement | null>,
+  mainText: string,
+  accentText = "",
+  className = ""
+) {
+  const lastAnimatedRef = useRef<string>("");
+
   useEffect(() => {
-    if (!ref.current || REDUCED_MOTION) return;
     const el = ref.current;
+    if (!el) return;
+
+    const main = mainText.trim();
+    const accent = accentText.trim();
+    const fullText = main + (accent ? " " + accent : "");
+
+    // Guard: skip re-running when text content is unchanged and spans already exist.
+    if (fullText === lastAnimatedRef.current && el.children.length > 0) return;
+
     el.innerHTML = "";
-    const chars = text.split("");
-    const spans: HTMLSpanElement[] = [];
-    chars.forEach((char) => {
+
+    // Helper that creates a single character span.
+    const makeSpan = (char: string, spanClass: string): HTMLSpanElement => {
       const span = document.createElement("span");
       span.textContent = char === " " ? "\u00A0" : char;
       span.style.display = "inline-block";
-      span.style.opacity = "0";
-      if (className) span.className = className;
+      if (REDUCED_MOTION) {
+        // Skip animation — show final state immediately so CSS coloring still works.
+        span.style.opacity = "1";
+        span.style.transform = "none";
+      } else {
+        span.style.opacity = "0";
+      }
+      if (spanClass) span.className = spanClass;
+      return span;
+    };
+
+    const allSpans: HTMLSpanElement[] = [];
+
+    // Pass 1 — main text (no accent class).
+    for (const char of main.split("")) {
+      const span = makeSpan(char, className);
       el.appendChild(span);
-      spans.push(span);
-    });
-    spans.forEach((span, i) => {
-      span.animate(
-        [
-          { opacity: 0, transform: "translateY(12px)" },
-          { opacity: 1, transform: "translateY(0)" },
-        ],
-        { duration: 400, delay: 100 + i * 12, easing: EASE, fill: "forwards" }
-      );
-    });
-  }, [ref, text, className]);
+      allSpans.push(span);
+    }
+
+    // Space between the two segments.
+    if (main && accent) {
+      const spaceSpan = makeSpan(" ", className);
+      el.appendChild(spaceSpan);
+      allSpans.push(spaceSpan);
+    }
+
+    // Pass 2 — accent text (always includes "accent" class).
+    const accentClass = [className, "accent"].filter(Boolean).join(" ");
+    for (const char of accent.split("")) {
+      const span = makeSpan(char, accentClass);
+      el.appendChild(span);
+      allSpans.push(span);
+    }
+
+    // Animate (skipped for REDUCED_MOTION — spans already have their final state).
+    if (!REDUCED_MOTION) {
+      allSpans.forEach((span, i) => {
+        span.animate(
+          [
+            { opacity: 0, transform: "translateY(12px)" },
+            { opacity: 1, transform: "translateY(0)" },
+          ],
+          { duration: 400, delay: 100 + i * 12, easing: EASE, fill: "forwards" }
+        );
+      });
+    }
+
+    lastAnimatedRef.current = fullText;
+  }, [ref, mainText, accentText, className]);
 }
 
 /** Fades + translates `ref`'s element up into place the first time it scrolls into view. */

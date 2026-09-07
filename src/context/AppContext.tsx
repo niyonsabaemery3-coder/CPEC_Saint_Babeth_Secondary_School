@@ -209,6 +209,7 @@ interface AppContextValue {
 
   // site content (editable via Admin > Settings)
   site: SiteContent;
+  siteLoaded: boolean;
   setSite: (updater: SiteContent | ((prev: SiteContent) => SiteContent)) => void;
   // Saves ONE section (home/about/academics/gallery/contact) to its own
   // endpoint — the payload should only contain that section's own fields.
@@ -281,6 +282,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [applicationTemplates, setApplicationTemplates] = useState({ pending: "", approved: "", rejected: "" });
   const [faqs, setFaqsState] = useState<Faq[]>(DEFAULT_FAQS);
   const [site, setSiteState] = useState<SiteContent>(DEFAULT_SITE);
+  const [siteLoaded, setSiteLoaded] = useState(false);
   const [pageBanners, setPageBanners] = useState<PageBanners>(DEFAULT_PAGE_BANNERS);
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [eventItems, setEventItems] = useState<EventItem[]>([]);
@@ -317,8 +319,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (data && typeof data === "object") {
           setSiteState((prev) => ({ ...prev, ...data }));
         }
+        setSiteLoaded(true);
       })
-      .catch((e) => console.error("Failed to load site content:", e));
+      .catch((e) => {
+        console.error("Failed to load site content:", e);
+        setSiteLoaded(true); // still show content even if API fails
+      });
 
     api
       .get<Partial<PageBanners>>("/api/page-banners")
@@ -948,6 +954,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addFaq,
     deleteFaq,
     site,
+    siteLoaded,
     setSite,
     saveSiteSection,
     updateRegistrationSettings,

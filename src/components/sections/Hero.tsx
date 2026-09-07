@@ -4,7 +4,7 @@ import { useApp } from "../../context/AppContext";
 import { useCountUp, useStaggerText } from "../../hooks/useScrollAnimations";
 
 export default function Hero() {
-  const { site, teachers, resources, studentAccounts } = useApp();
+  const { site, teachers, resources, studentAccounts, siteLoaded } = useApp();
   const heroImages = site.heroImages?.length ? site.heroImages : [site.heroImg];
   const heroImageKey = heroImages.join("|");
   const [heroIndex, setHeroIndex] = useState(0);
@@ -25,7 +25,7 @@ export default function Hero() {
     { icon: "fa-book-open", value: resources.length, label: "Learning Resources", to: "/resources" },
   ];
 
-  useStaggerText(titleRef, `${site.heroMain} ${site.heroAccent}`);
+  useStaggerText(titleRef, siteLoaded ? site.heroMain : "", siteLoaded ? site.heroAccent : "");
   useCountUp(featuresRef);
 
   useEffect(() => {
@@ -48,14 +48,12 @@ export default function Hero() {
     <section id="home" className="card">
       <div className="hero-grid">
         <div>
-          <div className="eyebrow">
+          <div className="eyebrow" style={siteLoaded ? undefined : { visibility: "hidden" }}>
             <span className="bar" /> Welcome to
           </div>
-          <h1 className="hero-title text-balance" ref={titleRef} aria-label={`${site.heroMain} ${site.heroAccent}`}>
-            {`${site.heroMain} ${site.heroAccent}`}
-          </h1>
-          <p className="sub">{site.heroSub}</p>
-          <div className="cta-row">
+          <h1 className="hero-title text-balance" ref={titleRef} aria-label={`${site.heroMain} ${site.heroAccent}`} />
+          <p className="sub" style={siteLoaded ? undefined : { visibility: "hidden" }}>{site.heroSub}</p>
+          <div className="cta-row" style={siteLoaded ? undefined : { visibility: "hidden" }}>
             <Link to="/admissions" className="btn-primary">
               <i className="fa-solid fa-pen-to-square" /> Apply Now
             </Link>

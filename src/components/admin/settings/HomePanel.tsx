@@ -109,7 +109,11 @@ export default function HomePanel() {
     setTextError(null);
     setTextSaved(false);
     try {
-      await saveSiteSection("home", pick(draft, TEXT_KEYS));
+      await saveSiteSection("home", pick({
+        ...draft,
+        heroMain: draft.heroMain.trim(),
+        heroAccent: draft.heroAccent.trim(),
+      }, TEXT_KEYS));
       setTextSaved(true);
     } catch {
       setTextError("Failed to save. Please try again.");
