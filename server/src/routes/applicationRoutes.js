@@ -13,6 +13,10 @@ function toPublic(req, row) {
     dob: row.dob,
     gender: row.gender,
     trackyear: row.track_year,
+    admissionType: row.admission_type || "",
+    indexNumber: row.index_number || "",
+    currentSchool: row.current_school || "",
+    currentLevel: row.current_level || "",
     report: row.report_file_name,
     reportData: toAbsoluteUploadUrl(req, row.report_file_url),
     prevschool: row.prev_school,
@@ -43,13 +47,16 @@ router.post("/", async (req, res) => {
 
   const [{ insertId }] = await pool.query(
     `INSERT INTO applications
-      (student_name, dob, gender, track_year, prev_school, district, sector, parent_name, parent_email, phone1, phone2, report_file_url, report_file_name, status, feedback)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+      (student_name, dob, gender, track_year, admission_type, index_number, current_level, prev_school, district, sector, parent_name, parent_email, phone1, phone2, report_file_url, report_file_name, status, feedback)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
     [
       b.name.trim(),
       b.dob || null,
       b.gender || null,
       b.trackyear || null,
+      b.admissionType || null,
+      b.indexNumber || null,
+      b.currentLevel || null,
       b.prevschool || null,
       b.district || null,
       b.sector || null,
@@ -59,7 +66,7 @@ router.post("/", async (req, res) => {
       b.phone2 || null,
       reportUrl,
       reportUrl ? b.report || null : null,
-      templates?.pending_message || "Your application has been received and is waiting for review.",
+      templates?.pending_message || "Your admission request has been received and is waiting for review.",
     ]
   );
 
@@ -87,30 +94,32 @@ router.get("/track/:id", async (req, res) => {
     "SELECT * FROM applications WHERE id = ? OR phone1 = ? OR phone2 = ? OR LOWER(parent_email) = LOWER(?) LIMIT 1",
     [numericId, value, value, value]
   );
-  if (!row) return res.status(404).json({ error: "Application not found. Check the application number and phone number." });
+  if (!row) return res.status(404).json({ error: "Application not found. Check the reference number and phone number." });
   res.json(toPublic(req, row));
 });
 
 router.get("/templates", requireAdmin, async (_req, res) => {
-  const [[row]] = await pool.query("SELECT pending_message AS pending, approved_message AS approved, rejected_message AS rejected FROM application_feedback_templates WHERE id = 1");
-  res.json(row || { pending: "", approved: "", rejected: "" });
+  const [[row]] = await pool.query(
+    "SELECT pending_message AS pending, approved_message AS approved, rejected_message AS rejected, under_review_message AS under_review, info_required_message AS info_required FROM application_feedback_templates WHERE id = 1"
+  );
+  res.json(row || { pending: "", approved: "", rejected: "", under_review: "", info_required: "" });
 });
 
 router.put("/templates", requireAdmin, async (req, res) => {
   const b = req.body || {};
   await pool.query(
-    `INSERT INTO application_feedback_templates (id, pending_message, approved_message, rejected_message)
-     VALUES (1, ?, ?, ?) ON DUPLICATE KEY UPDATE pending_message = VALUES(pending_message), approved_message = VALUES(approved_message), rejected_message = VALUES(rejected_message)`,
-    [b.pending || "", b.approved || "", b.rejected || ""]
+    `INSERT INTO application_feedback_templates (id, pending_message, approved_message, rejected_message, under_review_message, info_required_message)
+     VALUES (1, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE pending_message = VALUES(pending_message), approved_message = VALUES(approved_message), rejected_message = VALUES(rejected_message), under_review_message = VALUES(under_review_message), info_required_message = VALUES(info_required_message)`,
+    [b.pending || "", b.approved || "", b.rejected || "", b.under_review || "", b.info_required || ""]
   );
-  res.json({ pending: b.pending || "", approved: b.approved || "", rejected: b.rejected || "" });
+  res.json({ pending: b.pending || "", approved: b.approved || "", rejected: b.rejected || "", under_review: b.under_review || "", info_required: b.info_required || "" });
 });
 
 // Admin: approve or reject an application and optionally send feedback with
 // an attached image/document.
 router.put("/:id/review", requireAdmin, async (req, res) => {
   const b = req.body || {};
-  if (!["pending", "approved", "rejected"].includes(b.status)) return res.status(400).json({ error: "Invalid application status." });
+  if (!["pending", "under_review", "approved", "rejected", "info_required"].includes(b.status)) return res.status(400).json({ error: "Invalid application status." });
   const [[existing]] = await pool.query("SELECT * FROM applications WHERE id = ?", [req.params.id]);
   if (!existing) return res.status(404).json({ error: "Application not found." });
 
@@ -122,8 +131,20 @@ router.put("/:id/review", requireAdmin, async (req, res) => {
   }
   let feedback = typeof b.feedback === "string" ? b.feedback.trim() : "";
   if (!feedback) {
-    const [[template]] = await pool.query(`SELECT ${b.status}_message AS message FROM application_feedback_templates WHERE id = 1`);
-    feedback = template?.message || "";
+    const colMap = {
+      pending: "pending_message",
+      under_review: "under_review_message",
+      approved: "approved_message",
+      rejected: "rejected_message",
+      info_required: "info_required_message",
+    };
+    const col = colMap[b.status];
+    if (col) {
+      try {
+        const [[template]] = await pool.query(`SELECT ${col} AS message FROM application_feedback_templates WHERE id = 1`);
+        feedback = template?.message || "";
+      } catch { feedback = ""; }
+    }
   }
   await pool.query(
     "UPDATE applications SET status = ?, feedback = ?, feedback_file_url = ?, feedback_file_name = ? WHERE id = ?",

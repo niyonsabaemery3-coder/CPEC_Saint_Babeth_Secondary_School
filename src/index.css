@@ -1186,6 +1186,8 @@
   .application-status-pending{background:rgba(230,169,53,.16); color:var(--gold-dark);}
   .application-status-approved{background:rgba(47,145,87,.14); color:#287447;}
   .application-status-rejected{background:rgba(192,57,43,.12); color:#b1372a;}
+  .application-status-under_review { background: rgba(63,125,58,.14); color: var(--green); }
+  .application-status-info_required { background: rgba(74,90,168,.14); color: #3a5aa8; }
   .application-actions{display:flex; align-items:center; gap:7px; white-space:nowrap;}
   .application-actions .a-add-btn{padding:7px 10px; font-size:11px;}
   .application-review-overlay{position:fixed; inset:0; z-index:1100; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(15,17,22,.58);}

@@ -19,6 +19,10 @@ export interface StudentApplication {
   dob: string;
   gender: string;
   trackyear: string;
+  admissionType: string;   // "new_student" | "transfer" | "short_course" | ""
+  indexNumber: string;     // optional, may be ""
+  currentSchool: string;   // for transfer applicants
+  currentLevel: string;    // for transfer applicants
   report: string | null;
   reportData: string | null; // base64 data URL, held in memory only
   prevschool: string;
@@ -28,7 +32,7 @@ export interface StudentApplication {
   email: string;
   phone1: string;
   phone2: string;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "under_review" | "approved" | "rejected" | "info_required";
   feedback: string;
   feedbackFile: string | null;
   feedbackFileName: string | null;
@@ -155,6 +159,11 @@ export type SchoolClass =
   | "L3MRT"
   | "L4MRT"
   | "L5MRT"
+  | "L3MLT"
+  | "L4MLT"
+  | "L5MLT"
+  | "SC_SOD"
+  | "SC_MLT"
   | "OTHER";
 export type AccountStatus = "pending" | "active" | "deactivated";
 

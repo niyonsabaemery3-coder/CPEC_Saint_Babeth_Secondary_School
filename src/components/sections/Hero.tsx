@@ -55,7 +55,7 @@ export default function Hero() {
           <p className="sub" style={siteLoaded ? undefined : { visibility: "hidden" }}>{site.heroSub}</p>
           <div className="cta-row" style={siteLoaded ? undefined : { visibility: "hidden" }}>
             <Link to="/admissions" className="btn-primary">
-              <i className="fa-solid fa-pen-to-square" /> Apply Now
+              <i className="fa-solid fa-file-pen" /> Request Admission
             </Link>
             <Link to="/contact" className="btn-outline">
               Contact Us

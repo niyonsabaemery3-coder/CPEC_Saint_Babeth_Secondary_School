@@ -275,3 +275,23 @@ CREATE TABLE IF NOT EXISTS upcoming_events (
   created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+-- Migration: Admission Request improvements
+-- Run once on existing databases to add the new columns.
+-- Safe to re-run — uses IF NOT EXISTS / IGNORE.
+-- ---------------------------------------------------------------------------
+ALTER TABLE applications
+  ADD COLUMN IF NOT EXISTS admission_type  VARCHAR(30)  NULL AFTER track_year,
+  ADD COLUMN IF NOT EXISTS index_number    VARCHAR(80)  NULL AFTER admission_type,
+  ADD COLUMN IF NOT EXISTS current_school  VARCHAR(200) NULL AFTER index_number,
+  ADD COLUMN IF NOT EXISTS current_level   VARCHAR(50)  NULL AFTER current_school;
+
+ALTER TABLE application_feedback_templates
+  ADD COLUMN IF NOT EXISTS under_review_message TEXT NOT NULL DEFAULT '' AFTER rejected_message,
+  ADD COLUMN IF NOT EXISTS info_required_message TEXT NOT NULL DEFAULT '' AFTER under_review_message;
+
+-- Extend the status ENUM to add the two new statuses while keeping existing values.
+-- Safe for existing rows — they keep their current status value.
+ALTER TABLE applications
+  MODIFY COLUMN status ENUM('pending','under_review','approved','rejected','info_required') NOT NULL DEFAULT 'pending';

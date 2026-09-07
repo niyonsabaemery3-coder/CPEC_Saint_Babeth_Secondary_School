@@ -18,14 +18,14 @@ export default function AdmissionsCTA() {
             <i className="fa-solid fa-graduation-cap" />
           </span>
           <div>
-            <h2 id="admissions-cta-title">Admissions Are Open!</h2>
-            <p>Join CPEC Saint Babeth TSS today. Apply online in minutes — no account required.</p>
+            <h2 id="admissions-cta-title">Interested in Joining?</h2>
+            <p>Submit an admission request online. All requests are reviewed by the school and are subject to eligibility, available places, and the applicable admission process.</p>
           </div>
         </div>
 
         <div className="admissions-cta-actions" aria-label="Admissions actions">
           <Link to="/admissions" className="btn-primary admissions-cta-primary">
-            <i className="fa-solid fa-pen-to-square" aria-hidden="true" /> Apply Now
+            <i className="fa-solid fa-file-pen" aria-hidden="true" /> Request Admission
           </Link>
           <Link to="/track-application" className="btn-outline admissions-cta-secondary">
             <i className="fa-solid fa-magnifying-glass" aria-hidden="true" /> Track application

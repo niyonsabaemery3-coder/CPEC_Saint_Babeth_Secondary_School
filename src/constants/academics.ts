@@ -9,7 +9,7 @@ import type { SchoolClass } from "../types";
 export interface AcademicClass {
   value: SchoolClass;
   label: string;
-  group: "Ordinary Level" | "Software Development (SOD)" | "Multimedia Technology (MRT)" | "Other";
+  group: "Ordinary Level" | "Software Development (SOD)" | "Multimedia Technology (MRT)" | "Multimedia Production (MLT)" | "Other";
 }
 
 export const SCHOOL_CLASSES: AcademicClass[] = [
@@ -26,6 +26,8 @@ export const SCHOOL_CLASSES: AcademicClass[] = [
   { value: "L5MRT", label: "L5 MRT", group: "Multimedia Technology (MRT)" },
 
   { value: "OTHER", label: "Other", group: "Other" },
+  { value: "SC_SOD", label: "Short Course – Software Development", group: "Other" },
+  { value: "SC_MLT", label: "Short Course – Multimedia Production", group: "Other" },
 ];
 
 export const SCHOOL_CLASS_VALUES: SchoolClass[] = SCHOOL_CLASSES.map((c) => c.value);

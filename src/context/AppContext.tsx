@@ -192,9 +192,9 @@ interface AppContextValue {
 
   // applications
   applications: StudentApplication[];
-  applicationTemplates: { pending: string; approved: string; rejected: string };
+  applicationTemplates: { pending: string; approved: string; rejected: string; under_review: string; info_required: string };
   fetchApplicationTemplates: () => Promise<void>;
-  saveApplicationTemplates: (templates: { pending: string; approved: string; rejected: string }) => Promise<void>;
+  saveApplicationTemplates: (templates: { pending: string; approved: string; rejected: string; under_review: string; info_required: string }) => Promise<void>;
   addApplication: (a: StudentApplication) => Promise<StudentApplication>;
   reviewApplication: (id: number, data: { status: StudentApplication["status"]; feedback: string; feedbackFileData?: string | null; feedbackFileName?: string | null }) => Promise<void>;
   trackApplication: (value: string) => Promise<StudentApplication>;
@@ -279,7 +279,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [teachers, setTeachers] = useState<Teacher[]>(DEFAULT_TEACHERS);
   const [applications, setApplications] = useState<StudentApplication[]>([]);
-  const [applicationTemplates, setApplicationTemplates] = useState({ pending: "", approved: "", rejected: "" });
+  const [applicationTemplates, setApplicationTemplates] = useState({ pending: "", approved: "", rejected: "", under_review: "", info_required: "" });
   const [faqs, setFaqsState] = useState<Faq[]>(DEFAULT_FAQS);
   const [site, setSiteState] = useState<SiteContent>(DEFAULT_SITE);
   const [siteLoaded, setSiteLoaded] = useState(false);
@@ -483,10 +483,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const fetchApplicationTemplates = async () => {
-    setApplicationTemplates(await api.get<{ pending: string; approved: string; rejected: string }>("/api/applications/templates", "admin"));
+    setApplicationTemplates(await api.get<{ pending: string; approved: string; rejected: string; under_review: string; info_required: string }>("/api/applications/templates", "admin"));
   };
 
-  const saveApplicationTemplates = async (templates: { pending: string; approved: string; rejected: string }) => {
+  const saveApplicationTemplates = async (templates: { pending: string; approved: string; rejected: string; under_review: string; info_required: string }) => {
     const saved = await api.put<typeof templates>("/api/applications/templates", templates, "admin");
     setApplicationTemplates(saved);
   };

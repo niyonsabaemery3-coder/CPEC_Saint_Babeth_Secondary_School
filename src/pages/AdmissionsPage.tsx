@@ -10,7 +10,7 @@ export default function AdmissionsPage() {
   useSEO({
     title: "Admissions",
     description:
-      "Apply to CPEC Saint Babeth TSS in Byumba, Rwanda. Start your application online in a few simple steps.",
+      "Submit an admission request to CPEC Saint Babeth TSS in Byumba, Rwanda. All requests are reviewed by the school.",
     path: "/admissions",
   });
 
