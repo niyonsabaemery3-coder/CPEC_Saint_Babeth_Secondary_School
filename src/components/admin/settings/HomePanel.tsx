@@ -4,22 +4,6 @@ import { api } from "../../../lib/api";
 import FField from "./FField";
 import ImgTile from "./ImgTile";
 import SettingsMsg from "./SettingsMsg";
-import { pick } from "../../../utils/pick";
-
-// Text-field keys owned by this panel — these are saved via PUT /api/site/home.
-// heroImg / heroImages are intentionally excluded here; they are saved
-// individually via PUT /api/site/home/hero-images (one call per image row).
-const TEXT_KEYS = [
-  "heroMain",
-  "heroAccent",
-  "heroSub",
-  "feat1Title",
-  "feat1Desc",
-  "feat2Title",
-  "feat2Desc",
-  "feat3Title",
-  "feat3Desc",
-] as const;
 
 // Per-image save state shape
 type ImgRowState = { saving: boolean; saved: boolean; error: string | null };
@@ -29,10 +13,15 @@ export default function HomePanel() {
   const { site, saveSiteSection, setSite } = useApp();
   const [draft, setDraft] = useState(site);
 
-  // Text-section save state
-  const [textSaving, setTextSaving] = useState(false);
-  const [textSaved, setTextSaved] = useState(false);
-  const [textError, setTextError] = useState<string | null>(null);
+  // Hero text save state
+  const [heroTextSaving, setHeroTextSaving] = useState(false);
+  const [heroTextSaved, setHeroTextSaved] = useState(false);
+  const [heroTextError, setHeroTextError] = useState<string | null>(null);
+
+  // Highlight cards save state
+  const [highlightSaving, setHighlightSaving] = useState(false);
+  const [highlightSaved, setHighlightSaved] = useState(false);
+  const [highlightError, setHighlightError] = useState<string | null>(null);
 
   // Per-image row save state — one entry per slot in heroImages
   const [rowStates, setRowStates] = useState<ImgRowState[]>([]);
@@ -103,22 +92,44 @@ export default function HomePanel() {
     }
   };
 
-  // ------------------------------------------- save text fields ----------
-  const saveText = async () => {
-    setTextSaving(true);
-    setTextError(null);
-    setTextSaved(false);
+  // ------------------------------------------- save hero text ------------
+  const saveHeroText = async () => {
+    setHeroTextSaving(true);
+    setHeroTextError(null);
+    setHeroTextSaved(false);
     try {
-      await saveSiteSection("home", pick({
-        ...draft,
+      await saveSiteSection("home", {
         heroMain: draft.heroMain.trim(),
         heroAccent: draft.heroAccent.trim(),
-      }, TEXT_KEYS));
-      setTextSaved(true);
+        heroSub: draft.heroSub,
+      });
+      setHeroTextSaved(true);
     } catch {
-      setTextError("Failed to save. Please try again.");
+      setHeroTextError("Failed to save. Please try again.");
     } finally {
-      setTextSaving(false);
+      setHeroTextSaving(false);
+    }
+  };
+
+  // ------------------------------------------- save highlight cards ------
+  const saveHighlights = async () => {
+    setHighlightSaving(true);
+    setHighlightError(null);
+    setHighlightSaved(false);
+    try {
+      await saveSiteSection("home", {
+        feat1Title: draft.feat1Title,
+        feat1Desc: draft.feat1Desc,
+        feat2Title: draft.feat2Title,
+        feat2Desc: draft.feat2Desc,
+        feat3Title: draft.feat3Title,
+        feat3Desc: draft.feat3Desc,
+      });
+      setHighlightSaved(true);
+    } catch {
+      setHighlightError("Failed to save. Please try again.");
+    } finally {
+      setHighlightSaving(false);
     }
   };
 
@@ -223,6 +234,15 @@ export default function HomePanel() {
         <FField label="Title (main)" value={draft.heroMain} onChange={(v) => set("heroMain", v)} />
         <FField label="Title (highlighted part)" value={draft.heroAccent} onChange={(v) => set("heroAccent", v)} />
         <FField label="Subtitle" value={draft.heroSub} onChange={(v) => set("heroSub", v)} multiline />
+        <SettingsMsg
+          text={heroTextError || "Saved — changes are live on the homepage."}
+          type={heroTextError ? "err" : heroTextSaved ? "ok" : null}
+        />
+        <div className="sp-save-row">
+          <button className="a-add-btn" onClick={saveHeroText} disabled={heroTextSaving}>
+            <i className="fa-solid fa-floppy-disk" /> {heroTextSaving ? "Saving…" : "Save hero text"}
+          </button>
+        </div>
       </div>
 
       <div className="sp-block">
@@ -233,16 +253,15 @@ export default function HomePanel() {
         <FField label="Card 2 description" value={draft.feat2Desc} onChange={(v) => set("feat2Desc", v)} multiline />
         <FField label="Card 3 title" value={draft.feat3Title} onChange={(v) => set("feat3Title", v)} />
         <FField label="Card 3 description" value={draft.feat3Desc} onChange={(v) => set("feat3Desc", v)} multiline />
-      </div>
-
-      <SettingsMsg
-        text={textError || "Text changes saved — exit to the website to see them live."}
-        type={textError ? "err" : textSaved ? "ok" : null}
-      />
-      <div className="sp-save-row">
-        <button className="a-add-btn" onClick={saveText} disabled={textSaving}>
-          <i className="fa-solid fa-check" /> {textSaving ? "Saving..." : "Save text changes"}
-        </button>
+        <SettingsMsg
+          text={highlightError || "Saved — changes are live on the homepage."}
+          type={highlightError ? "err" : highlightSaved ? "ok" : null}
+        />
+        <div className="sp-save-row">
+          <button className="a-add-btn" onClick={saveHighlights} disabled={highlightSaving}>
+            <i className="fa-solid fa-floppy-disk" /> {highlightSaving ? "Saving…" : "Save highlight cards"}
+          </button>
+        </div>
       </div>
     </>
   );
