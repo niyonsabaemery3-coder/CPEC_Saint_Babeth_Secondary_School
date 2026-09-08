@@ -81,16 +81,16 @@ async function migrateApplicationFeedbackTemplates() {
         pending_message       TEXT NOT NULL,
         approved_message      TEXT NOT NULL,
         rejected_message      TEXT NOT NULL,
-        under_review_message  TEXT NOT NULL DEFAULT '',
-        info_required_message TEXT NOT NULL DEFAULT '',
+        under_review_message  TEXT NULL,
+        info_required_message TEXT NULL,
         updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT chk_application_feedback_templates_singleton CHECK (id = 1)
       ) ENGINE=InnoDB
     `);
     console.log("  created application_feedback_templates");
   } else {
-    await addColumn("application_feedback_templates", "under_review_message",  "TEXT NOT NULL DEFAULT '' AFTER rejected_message");
-    await addColumn("application_feedback_templates", "info_required_message", "TEXT NOT NULL DEFAULT '' AFTER under_review_message");
+    await addColumn("application_feedback_templates", "under_review_message",  "TEXT NULL AFTER rejected_message");
+    await addColumn("application_feedback_templates", "info_required_message", "TEXT NULL AFTER under_review_message");
   }
 
   // Seed a default row if none exists yet

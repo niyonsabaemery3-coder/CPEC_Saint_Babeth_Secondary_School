@@ -590,8 +590,8 @@ async function runAdmissionTypeMigration() {
   );
   if (Number(urCol?.cnt) === 0) {
     console.log("🔧 Adding under_review_message and info_required_message to feedback templates...");
-    await db.query("ALTER TABLE application_feedback_templates ADD COLUMN under_review_message TEXT NOT NULL DEFAULT '' AFTER rejected_message");
-    await db.query("ALTER TABLE application_feedback_templates ADD COLUMN info_required_message TEXT NOT NULL DEFAULT '' AFTER under_review_message");
+    await db.query("ALTER TABLE application_feedback_templates ADD COLUMN under_review_message TEXT NULL AFTER rejected_message");
+    await db.query("ALTER TABLE application_feedback_templates ADD COLUMN info_required_message TEXT NULL AFTER under_review_message");
     console.log("✔ Feedback template columns added.");
   }
 }

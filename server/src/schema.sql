@@ -305,8 +305,8 @@ ALTER TABLE applications
 
 -- Feedback templates: add the two new message columns.
 ALTER TABLE application_feedback_templates
-  ADD COLUMN IF NOT EXISTS under_review_message  TEXT NOT NULL DEFAULT '' AFTER rejected_message,
-  ADD COLUMN IF NOT EXISTS info_required_message TEXT NOT NULL DEFAULT '' AFTER under_review_message;
+  ADD COLUMN IF NOT EXISTS under_review_message  TEXT NULL AFTER rejected_message,
+  ADD COLUMN IF NOT EXISTS info_required_message TEXT NULL AFTER under_review_message;
 
 -- ---------------------------------------------------------------------------
 -- Grading system — subjects, exam terms, per-class subject/teacher
