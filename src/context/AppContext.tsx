@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+﻿import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type {
   Teacher,
   StudentApplication,
@@ -158,6 +158,7 @@ interface AppContextValue {
   teacherLogin: (email: string, password: string) => Promise<{ ok: boolean; message: string }>;
   teacherLogout: () => void;
   updateTeacherPassword: (currentPassword: string, newPassword: string) => Promise<{ ok: boolean; message: string }>;
+  updateTeacherProfile: (data: { fullName?: string; email?: string; subject?: string }) => Promise<{ ok: boolean; message: string }>;
 
   // student accounts (admin-managed, plus optional self-registration — see registrationSettings)
   studentAccounts: StudentAccount[];
@@ -172,6 +173,7 @@ interface AppContextValue {
   studentLogin: (email: string, password: string) => Promise<{ ok: boolean; message: string }>;
   studentLogout: () => void;
   updateStudentPassword: (currentPassword: string, newPassword: string) => Promise<{ ok: boolean; message: string }>;
+  updateStudentProfile: (data: { fullName?: string; email?: string; schoolClass?: string }) => Promise<{ ok: boolean; message: string }>;
 
   // resources (Notes / Presentations / Past Papers)
   resources: Resource[];
@@ -755,6 +757,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateTeacherProfile = async (data: { fullName?: string; email?: string; subject?: string }) => {
+    try {
+      const updated = await api.put<TeacherAccount>("/api/auth/teacher/profile", data, "teacher");
+      setCurrentTeacher(updated);
+      return { ok: true, message: "Profile updated successfully." };
+    } catch (e) {
+      return { ok: false, message: e instanceof ApiError ? e.message : "Something went wrong. Please try again." };
+    }
+  };
+
   // -------------------------------------------------------------- STUDENT AUTH --
   const createStudentAccount = async (data: { fullName: string; email: string; password: string; schoolClass: string }) => {
     try {
@@ -803,6 +815,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const res = await api.put<{ message: string }>("/api/auth/student/password", { currentPassword, newPassword }, "student");
       return { ok: true, message: res.message };
+    } catch (e) {
+      return { ok: false, message: e instanceof ApiError ? e.message : "Something went wrong. Please try again." };
+    }
+  };
+
+  const updateStudentProfile = async (data: { fullName?: string; email?: string; schoolClass?: string }) => {
+    try {
+      const updated = await api.put<StudentAccount>("/api/auth/student/profile", data, "student");
+      setCurrentStudent(updated);
+      return { ok: true, message: "Profile updated successfully." };
     } catch (e) {
       return { ok: false, message: e instanceof ApiError ? e.message : "Something went wrong. Please try again." };
     }
@@ -918,6 +940,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     teacherLogin,
     teacherLogout,
     updateTeacherPassword,
+    updateTeacherProfile,
     studentAccounts,
     fetchStudentAccounts,
     createStudentAccount,
@@ -930,6 +953,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     studentLogin,
     studentLogout,
     updateStudentPassword,
+    updateStudentProfile,
     resources,
     addResource,
     updateResource,
