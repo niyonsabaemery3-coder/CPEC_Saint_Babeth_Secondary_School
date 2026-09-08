@@ -525,20 +525,19 @@ async function runAuditLogMigration() {
 
 async function runApplicationsTableEnsureColumns() {
   // Ensures every column the application routes depend on actually exists.
-  // Covers databases created from old schemas that were missing some original
-  // columns (e.g. parent_email, feedback_file_url) as well as all new columns
-  // added by later features. Each ALTER is guarded by an information_schema
-  // check so it is a no-op on databases that already have the column.
+  // Each ALTER is guarded by an information_schema check so it is a no-op
+  // on databases that already have the column.
   const colsToEnsure = [
-    // Original schema columns that some old DBs may be missing
-    { name: "parent_email",        sql: "ALTER TABLE applications ADD COLUMN parent_email VARCHAR(180) NULL AFTER parent_name" },
-    { name: "feedback_file_url",   sql: "ALTER TABLE applications ADD COLUMN feedback_file_url VARCHAR(500) NULL AFTER feedback" },
-    { name: "feedback_file_name",  sql: "ALTER TABLE applications ADD COLUMN feedback_file_name VARCHAR(255) NULL AFTER feedback_file_url" },
-    // Admission Request feature columns
-    { name: "admission_type",      sql: "ALTER TABLE applications ADD COLUMN admission_type VARCHAR(30) NULL AFTER track_year" },
-    { name: "index_number",        sql: "ALTER TABLE applications ADD COLUMN index_number VARCHAR(80) NULL AFTER admission_type" },
-    { name: "current_school",      sql: "ALTER TABLE applications ADD COLUMN current_school VARCHAR(200) NULL AFTER index_number" },
-    { name: "current_level",       sql: "ALTER TABLE applications ADD COLUMN current_level VARCHAR(50) NULL AFTER current_school" },
+    { name: "parent_email",       sql: "ALTER TABLE applications ADD COLUMN parent_email VARCHAR(180) NULL AFTER parent_name" },
+    { name: "status",             sql: "ALTER TABLE applications ADD COLUMN status ENUM('pending','under_review','approved','rejected','info_required') NOT NULL DEFAULT 'pending' AFTER report_file_name" },
+    { name: "feedback",           sql: "ALTER TABLE applications ADD COLUMN feedback TEXT NULL AFTER status" },
+    { name: "feedback_file_url",  sql: "ALTER TABLE applications ADD COLUMN feedback_file_url VARCHAR(500) NULL AFTER feedback" },
+    { name: "feedback_file_name", sql: "ALTER TABLE applications ADD COLUMN feedback_file_name VARCHAR(255) NULL AFTER feedback_file_url" },
+    { name: "updated_at",         sql: "ALTER TABLE applications ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER feedback_file_name" },
+    { name: "admission_type",     sql: "ALTER TABLE applications ADD COLUMN admission_type VARCHAR(30) NULL AFTER track_year" },
+    { name: "index_number",       sql: "ALTER TABLE applications ADD COLUMN index_number VARCHAR(80) NULL AFTER admission_type" },
+    { name: "current_school",     sql: "ALTER TABLE applications ADD COLUMN current_school VARCHAR(200) NULL AFTER index_number" },
+    { name: "current_level",      sql: "ALTER TABLE applications ADD COLUMN current_level VARCHAR(50) NULL AFTER current_school" },
   ];
 
   for (const col of colsToEnsure) {
@@ -553,7 +552,8 @@ async function runApplicationsTableEnsureColumns() {
     }
   }
 
-  // Ensure status ENUM includes all 5 values
+  // Ensure status ENUM includes all 5 values (for columns that existed but
+  // were created with the old 3-value ENUM).
   const [[statusCol]] = await db.query(
     "SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'applications' AND COLUMN_NAME = 'status'"
   );
@@ -566,21 +566,11 @@ async function runApplicationsTableEnsureColumns() {
   }
 }
 async function runAdmissionTypeMigration() {
-  // Adds admission_type, index_number, current_level columns to applications,
-  // extends the status ENUM, and adds under_review/info_required feedback template
-  // columns — for databases created before the Admission Request feature was added.
-
-  // Check admission_type column
-  const [[admCol]] = await db.query(
-    "SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'applications' AND COLUMN_NAME = 'admission_type'"
-  );
-  if (Number(admCol?.cnt) === 0) {
-    console.log("🔧 Adding admission_type, index_number, current_level columns to applications...");
-    await db.query("ALTER TABLE applications ADD COLUMN admission_type VARCHAR(30) NULL AFTER track_year");
-    await db.query("ALTER TABLE applications ADD COLUMN index_number VARCHAR(80) NULL AFTER admission_type");
-    await db.query("ALTER TABLE applications ADD COLUMN current_level VARCHAR(50) NULL AFTER index_number");
-    console.log("✔ admission_type, index_number, current_level columns added.");
-  }
+  // Extends the status ENUM and adds under_review/info_required feedback
+  // template columns — for databases created before the Admission Request
+  // feature was added. Column additions are handled by
+  // runApplicationsTableEnsureColumns(); this function only handles the
+  // ENUM widening and the feedback templates table changes.
 
   // Extend status ENUM to include under_review and info_required
   const [[statusCol]] = await db.query(
