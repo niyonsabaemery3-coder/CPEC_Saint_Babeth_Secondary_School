@@ -3,8 +3,13 @@ const pool = require("../db");
 const { requireAdmin } = require("../middleware/auth");
 const { SCHOOL_CLASS_VALUES } = require("../constants/academics");
 const { hashPassword } = require("../utils/password");
+const { logAction } = require("../utils/audit");
 
 const router = express.Router();
+
+function actorName(auth) {
+  return auth.username || auth.email || null;
+}
 
 function toPublic(row) {
   return {
@@ -73,21 +78,64 @@ router.post("/", requireAdmin, async (req, res) => {
   );
 
   const [rows] = await pool.query("SELECT * FROM student_accounts WHERE id = ?", [insertId]);
+
+  await logAction({
+    actorRole: "admin",
+    actorId: req.auth.id,
+    actorName: actorName(req.auth),
+    action: "create",
+    entityType: "student_account",
+    entityId: insertId,
+    details: { fullName: fullName.trim(), email: normalizedEmail, schoolClass },
+  });
+
   res.status(201).json(toPublic(rows[0]));
 });
 
 router.patch("/:id/activate", requireAdmin, async (req, res) => {
   await pool.query("UPDATE student_accounts SET status = 'active' WHERE id = ?", [req.params.id]);
+
+  await logAction({
+    actorRole: "admin",
+    actorId: req.auth.id,
+    actorName: actorName(req.auth),
+    action: "activate",
+    entityType: "student_account",
+    entityId: req.params.id,
+  });
+
   res.json({ message: "Account activated." });
 });
 
 router.patch("/:id/deactivate", requireAdmin, async (req, res) => {
   await pool.query("UPDATE student_accounts SET status = 'deactivated' WHERE id = ?", [req.params.id]);
+
+  await logAction({
+    actorRole: "admin",
+    actorId: req.auth.id,
+    actorName: actorName(req.auth),
+    action: "deactivate",
+    entityType: "student_account",
+    entityId: req.params.id,
+  });
+
   res.json({ message: "Account deactivated." });
 });
 
 router.delete("/:id", requireAdmin, async (req, res) => {
+  const [rows] = await pool.query("SELECT full_name, email FROM student_accounts WHERE id = ?", [req.params.id]);
   await pool.query("DELETE FROM student_accounts WHERE id = ?", [req.params.id]);
+
+  await logAction({
+    actorRole: "admin",
+    actorId: req.auth.id,
+    actorName: actorName(req.auth),
+    action: "delete",
+    entityType: "student_account",
+    entityId: req.params.id,
+    details: rows[0] || null,
+  });
+
   res.json({ message: "Account deleted." });
 });
 

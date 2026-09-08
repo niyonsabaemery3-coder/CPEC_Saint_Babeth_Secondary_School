@@ -81,4 +81,22 @@ function requireAdminOrTeacher(req, res, next) {
   next();
 }
 
-module.exports = { signToken, optionalAuth, requireAdmin, requireTeacher, requireStudent, requireAdminOrTeacher };
+/** Any logged-in role (admin, teacher or student) may proceed. */
+function requireAnyAuth(req, res, next) {
+  const auth = readToken(req);
+  if (!auth) {
+    return res.status(401).json({ error: "Login required." });
+  }
+  req.auth = auth;
+  next();
+}
+
+module.exports = {
+  signToken,
+  optionalAuth,
+  requireAdmin,
+  requireTeacher,
+  requireStudent,
+  requireAdminOrTeacher,
+  requireAnyAuth,
+};

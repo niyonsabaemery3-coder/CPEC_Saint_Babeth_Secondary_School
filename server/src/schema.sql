@@ -295,3 +295,78 @@ ALTER TABLE application_feedback_templates
 -- Safe for existing rows — they keep their current status value.
 ALTER TABLE applications
   MODIFY COLUMN status ENUM('pending','under_review','approved','rejected','info_required') NOT NULL DEFAULT 'pending';
+
+-- ---------------------------------------------------------------------------
+-- Grading system — subjects, exam terms, per-class subject/teacher
+-- assignment, and the marks themselves. Averages, totals and class rank are
+-- computed on read (see markRoutes.js) rather than stored, so they can never
+-- go stale relative to the raw marks.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS subjects (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  name       VARCHAR(120) NOT NULL,
+  code       VARCHAR(20) NOT NULL UNIQUE,
+  max_score  DECIMAL(6,2) NOT NULL DEFAULT 100.00,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS exam_terms (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  name        VARCHAR(100) NOT NULL,
+  school_year VARCHAR(20) NOT NULL,
+  is_current  TINYINT(1) NOT NULL DEFAULT 0,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_term_year (name, school_year)
+) ENGINE=InnoDB;
+
+-- Which subjects each class takes, and who teaches each one (nullable —
+-- a subject can be assigned to a class before a teacher is staffed on it).
+CREATE TABLE IF NOT EXISTS class_subjects (
+  id                 INT AUTO_INCREMENT PRIMARY KEY,
+  school_class       ENUM('S1','S2','S3','L3SOD','L4SOD','L5SOD','L3MRT','L4MRT','L5MRT','OTHER') NOT NULL,
+  subject_id         INT NOT NULL,
+  teacher_account_id INT NULL,
+  created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_class_subject (school_class, subject_id),
+  CONSTRAINT fk_class_subjects_subject
+    FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_class_subjects_teacher
+    FOREIGN KEY (teacher_account_id) REFERENCES teacher_accounts(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- One row per student/subject/term. entered_by_teacher_id records who last
+-- saved the mark (feeds the audit trail alongside audit_logs below).
+CREATE TABLE IF NOT EXISTS student_marks (
+  id                    INT AUTO_INCREMENT PRIMARY KEY,
+  student_id            INT NOT NULL,
+  subject_id            INT NOT NULL,
+  term_id               INT NOT NULL,
+  score                 DECIMAL(6,2) NOT NULL,
+  entered_by_teacher_id INT NULL,
+  created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_student_subject_term (student_id, subject_id, term_id),
+  CONSTRAINT fk_marks_student FOREIGN KEY (student_id) REFERENCES student_accounts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_marks_subject FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_marks_term FOREIGN KEY (term_id) REFERENCES exam_terms(id) ON DELETE CASCADE,
+  CONSTRAINT fk_marks_teacher FOREIGN KEY (entered_by_teacher_id) REFERENCES teacher_accounts(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
+-- Audit log — a durable record of who changed what, across accounts,
+-- grades, subjects and terms. Never blocks the action it describes (see
+-- utils/audit.js); a logging failure is swallowed and only console-logged.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  actor_role  VARCHAR(20) NOT NULL,
+  actor_id    INT NULL,
+  actor_name  VARCHAR(150),
+  action      VARCHAR(60) NOT NULL,
+  entity_type VARCHAR(60) NOT NULL,
+  entity_id   VARCHAR(60),
+  details     TEXT,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_audit_logs_entity (entity_type, entity_id),
+  INDEX idx_audit_logs_created (created_at)
+) ENGINE=InnoDB;

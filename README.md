@@ -12,6 +12,11 @@ The frontend is a static site meant for GitHub Pages (or any static host); the b
 Node.js + MySQL host (Render, Railway, a VPS, etc. — GitHub Pages can't run it). See
 [Deploying to GitHub Pages](#deploying-the-frontend-to-github-pages) and `server/README.md` for both halves.
 
+> **Handing this project off (to a person or an AI)?** Read
+> [`PROJECT_HANDOFF.md`](./PROJECT_HANDOFF.md) first — it's the single
+> source of truth for what's implemented, what's not, and exact steps to
+> verify the grading system / audit log actually work before trusting them.
+
 ## Stack
 
 - **Vite** + **React 19** + **TypeScript** + **Tailwind CSS v4** (frontend)

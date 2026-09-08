@@ -40,6 +40,14 @@ const newsRoutes = require("./routes/newsRoutes");
 
 const eventRoutes = require("./routes/eventRoutes");
 
+const subjectRoutes = require("./routes/subjectRoutes");
+
+const termRoutes = require("./routes/termRoutes");
+
+const markRoutes = require("./routes/markRoutes");
+
+const auditRoutes = require("./routes/auditRoutes");
+
 const app = express();
 
 app.set("trust proxy", 1);
@@ -168,6 +176,14 @@ app.use("/api/page-banners", pageBannerRoutes);
 app.use("/api/news", newsRoutes);
 
 app.use("/api/events", eventRoutes);
+
+app.use("/api/subjects", subjectRoutes);
+
+app.use("/api/terms", termRoutes);
+
+app.use("/api/marks", markRoutes);
+
+app.use("/api/audit-logs", auditRoutes);
 
 // Client-side routes the SPA actually handles (kept in sync with src/App.tsx).
 // A request for anything else is a genuine 404 — even though we still need
@@ -427,6 +443,85 @@ async function runSchoolClassEnumMigration() {
   console.log("✔ school_class ENUM updated on resources and student_accounts.");
 }
 
+async function runGradingSystemMigration() {
+  // Idempotent (CREATE TABLE IF NOT EXISTS) — safe to run on every startup so
+  // databases created before the grading feature was added pick up the four
+  // new tables (subjects, exam_terms, class_subjects, student_marks)
+  // without needing a manual `npm run db:init`.
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS subjects (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      name       VARCHAR(120) NOT NULL,
+      code       VARCHAR(20) NOT NULL UNIQUE,
+      max_score  DECIMAL(6,2) NOT NULL DEFAULT 100.00,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS exam_terms (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      name        VARCHAR(100) NOT NULL,
+      school_year VARCHAR(20) NOT NULL,
+      is_current  TINYINT(1) NOT NULL DEFAULT 0,
+      created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_term_year (name, school_year)
+    ) ENGINE=InnoDB
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS class_subjects (
+      id                 INT AUTO_INCREMENT PRIMARY KEY,
+      school_class       ENUM('S1','S2','S3','L3SOD','L4SOD','L5SOD','L3MRT','L4MRT','L5MRT','OTHER') NOT NULL,
+      subject_id         INT NOT NULL,
+      teacher_account_id INT NULL,
+      created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_class_subject (school_class, subject_id),
+      CONSTRAINT fk_class_subjects_subject
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+      CONSTRAINT fk_class_subjects_teacher
+        FOREIGN KEY (teacher_account_id) REFERENCES teacher_accounts(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS student_marks (
+      id                    INT AUTO_INCREMENT PRIMARY KEY,
+      student_id            INT NOT NULL,
+      subject_id            INT NOT NULL,
+      term_id               INT NOT NULL,
+      score                 DECIMAL(6,2) NOT NULL,
+      entered_by_teacher_id INT NULL,
+      created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_student_subject_term (student_id, subject_id, term_id),
+      CONSTRAINT fk_marks_student FOREIGN KEY (student_id) REFERENCES student_accounts(id) ON DELETE CASCADE,
+      CONSTRAINT fk_marks_subject FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+      CONSTRAINT fk_marks_term FOREIGN KEY (term_id) REFERENCES exam_terms(id) ON DELETE CASCADE,
+      CONSTRAINT fk_marks_teacher FOREIGN KEY (entered_by_teacher_id) REFERENCES teacher_accounts(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB
+  `);
+}
+
+async function runAuditLogMigration() {
+  // Idempotent — safe on every startup, same pattern as the tables above.
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      actor_role  VARCHAR(20) NOT NULL,
+      actor_id    INT NULL,
+      actor_name  VARCHAR(150),
+      action      VARCHAR(60) NOT NULL,
+      entity_type VARCHAR(60) NOT NULL,
+      entity_id   VARCHAR(60),
+      details     TEXT,
+      created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_audit_logs_entity (entity_type, entity_id),
+      INDEX idx_audit_logs_created (created_at)
+    ) ENGINE=InnoDB
+  `);
+}
+
 async function runMigrations() {
   await runAboutHistoryMigration();
   await runGalleryMigration();
@@ -435,6 +530,8 @@ async function runMigrations() {
   await runNewsEventsMigration();
   await runProgramSectionsMigration();
   await runSchoolClassEnumMigration();
+  await runGradingSystemMigration();
+  await runAuditLogMigration();
 
   const [cols] = await db.query(
     "SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'site_content' AND COLUMN_NAME = 'allow_student_register'"
