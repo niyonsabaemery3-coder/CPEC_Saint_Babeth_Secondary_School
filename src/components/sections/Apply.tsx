@@ -460,11 +460,33 @@ export default function Apply() {
               </div>
             </div>
 
-            {/* Success toast */}
-            <div className={`toast-msg ${toast ? "show" : ""}`}>
-              <i className="fa-solid fa-circle-check" /> Admission request submitted! Your reference number is <strong>#{submittedId}</strong>. Save it to track your request status.
-              <br /><Link to="/track-application" style={{ color: "inherit", textDecoration: "underline" }}>Track your request</Link>
-            </div>
+            {/* Success confirmation card — shown after submission */}
+            {toast && submittedId && (
+              <div className="apply-success-card">
+                <div className="apply-success-icon">
+                  <i className="fa-solid fa-envelope-open-text" />
+                </div>
+                <div className="apply-success-body">
+                  <div className="apply-success-title">
+                    <i className="fa-solid fa-circle-check" /> Admission Request Submitted!
+                  </div>
+                  <p className="apply-success-msg">
+                    Your admission request has been received and is currently <strong>pending review</strong> by the admissions office.
+                    You will be contacted once a decision has been made.
+                  </p>
+                  <div className="apply-success-ref">
+                    <span className="apply-success-ref-label">Your reference number</span>
+                    <strong className="apply-success-ref-num">#{submittedId}</strong>
+                  </div>
+                  <div className="apply-success-feedback">
+                    <i className="fa-solid fa-clock-rotate-left" /> Save your reference number and use it to track the status of your request at any time.
+                  </div>
+                  <Link to="/track-application" className="btn-primary apply-success-track-btn">
+                    <i className="fa-solid fa-magnifying-glass" /> Track your admission request
+                  </Link>
+                </div>
+              </div>
+            )}
           </form>
         </div>
       </div>
