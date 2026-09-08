@@ -277,24 +277,36 @@ CREATE TABLE IF NOT EXISTS upcoming_events (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------------
--- Migration: Admission Request improvements
--- Run once on existing databases to add the new columns.
--- Safe to re-run — uses IF NOT EXISTS / IGNORE.
+-- Migrations: safe to re-run on existing databases (uses IF NOT EXISTS).
+-- New databases created via db:init already have these columns from the
+-- CREATE TABLE statements above and MySQL will silently skip them.
 -- ---------------------------------------------------------------------------
+
+-- Admission Request improvements (round 1): parent contact + tracking fields.
+ALTER TABLE applications
+  ADD COLUMN IF NOT EXISTS parent_email      VARCHAR(180) NULL AFTER parent_name,
+  ADD COLUMN IF NOT EXISTS status            ENUM('pending','under_review','approved','rejected','info_required') NOT NULL DEFAULT 'pending' AFTER report_file_name,
+  ADD COLUMN IF NOT EXISTS feedback          TEXT         NULL AFTER status,
+  ADD COLUMN IF NOT EXISTS feedback_file_url  VARCHAR(500) NULL AFTER feedback,
+  ADD COLUMN IF NOT EXISTS feedback_file_name VARCHAR(255) NULL AFTER feedback_file_url,
+  ADD COLUMN IF NOT EXISTS updated_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER feedback_file_name;
+
+-- Admission Request improvements (round 2): admission type + school level.
 ALTER TABLE applications
   ADD COLUMN IF NOT EXISTS admission_type  VARCHAR(30)  NULL AFTER track_year,
   ADD COLUMN IF NOT EXISTS index_number    VARCHAR(80)  NULL AFTER admission_type,
   ADD COLUMN IF NOT EXISTS current_school  VARCHAR(200) NULL AFTER index_number,
   ADD COLUMN IF NOT EXISTS current_level   VARCHAR(50)  NULL AFTER current_school;
 
-ALTER TABLE application_feedback_templates
-  ADD COLUMN IF NOT EXISTS under_review_message TEXT NOT NULL DEFAULT '' AFTER rejected_message,
-  ADD COLUMN IF NOT EXISTS info_required_message TEXT NOT NULL DEFAULT '' AFTER under_review_message;
-
--- Extend the status ENUM to add the two new statuses while keeping existing values.
+-- Widen status ENUM to include the two new review statuses.
 -- Safe for existing rows — they keep their current status value.
 ALTER TABLE applications
   MODIFY COLUMN status ENUM('pending','under_review','approved','rejected','info_required') NOT NULL DEFAULT 'pending';
+
+-- Feedback templates: add the two new message columns.
+ALTER TABLE application_feedback_templates
+  ADD COLUMN IF NOT EXISTS under_review_message  TEXT NOT NULL DEFAULT '' AFTER rejected_message,
+  ADD COLUMN IF NOT EXISTS info_required_message TEXT NOT NULL DEFAULT '' AFTER under_review_message;
 
 -- ---------------------------------------------------------------------------
 -- Grading system — subjects, exam terms, per-class subject/teacher

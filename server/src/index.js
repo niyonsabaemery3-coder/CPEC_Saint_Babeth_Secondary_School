@@ -1,4 +1,4 @@
-require("./config/env");
+﻿require("./config/env");
 
 const db = require("./db");
 
@@ -522,6 +522,49 @@ async function runAuditLogMigration() {
   `);
 }
 
+
+async function runApplicationsTableEnsureColumns() {
+  // Ensures every column the application routes depend on actually exists.
+  // Covers databases created from old schemas that were missing some original
+  // columns (e.g. parent_email, feedback_file_url) as well as all new columns
+  // added by later features. Each ALTER is guarded by an information_schema
+  // check so it is a no-op on databases that already have the column.
+  const colsToEnsure = [
+    // Original schema columns that some old DBs may be missing
+    { name: "parent_email",        sql: "ALTER TABLE applications ADD COLUMN parent_email VARCHAR(180) NULL AFTER parent_name" },
+    { name: "feedback_file_url",   sql: "ALTER TABLE applications ADD COLUMN feedback_file_url VARCHAR(500) NULL AFTER feedback" },
+    { name: "feedback_file_name",  sql: "ALTER TABLE applications ADD COLUMN feedback_file_name VARCHAR(255) NULL AFTER feedback_file_url" },
+    // Admission Request feature columns
+    { name: "admission_type",      sql: "ALTER TABLE applications ADD COLUMN admission_type VARCHAR(30) NULL AFTER track_year" },
+    { name: "index_number",        sql: "ALTER TABLE applications ADD COLUMN index_number VARCHAR(80) NULL AFTER admission_type" },
+    { name: "current_school",      sql: "ALTER TABLE applications ADD COLUMN current_school VARCHAR(200) NULL AFTER index_number" },
+    { name: "current_level",       sql: "ALTER TABLE applications ADD COLUMN current_level VARCHAR(50) NULL AFTER current_school" },
+  ];
+
+  for (const col of colsToEnsure) {
+    const [[row]] = await db.query(
+      "SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'applications' AND COLUMN_NAME = ?",
+      [col.name]
+    );
+    if (Number(row?.cnt) === 0) {
+      console.log(`🔧 Adding missing column applications.${col.name}...`);
+      await db.query(col.sql);
+      console.log(`✔ applications.${col.name} added.`);
+    }
+  }
+
+  // Ensure status ENUM includes all 5 values
+  const [[statusCol]] = await db.query(
+    "SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'applications' AND COLUMN_NAME = 'status'"
+  );
+  if (statusCol && !statusCol.COLUMN_TYPE.includes("under_review")) {
+    console.log("🔧 Extending applications.status ENUM...");
+    await db.query(
+      "ALTER TABLE applications MODIFY COLUMN status ENUM('pending','under_review','approved','rejected','info_required') NOT NULL DEFAULT 'pending'"
+    );
+    console.log("✔ applications.status ENUM extended.");
+  }
+}
 async function runAdmissionTypeMigration() {
   // Adds admission_type, index_number, current_level columns to applications,
   // extends the status ENUM, and adds under_review/info_required feedback template
@@ -564,6 +607,7 @@ async function runAdmissionTypeMigration() {
 }
 
 async function runMigrations() {
+  await runApplicationsTableEnsureColumns();
   await runAboutHistoryMigration();
   await runGalleryMigration();
   await runHeroMigration();
