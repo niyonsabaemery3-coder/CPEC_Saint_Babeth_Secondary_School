@@ -522,6 +522,47 @@ async function runAuditLogMigration() {
   `);
 }
 
+async function runAdmissionTypeMigration() {
+  // Adds admission_type, index_number, current_level columns to applications,
+  // extends the status ENUM, and adds under_review/info_required feedback template
+  // columns — for databases created before the Admission Request feature was added.
+
+  // Check admission_type column
+  const [[admCol]] = await db.query(
+    "SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'applications' AND COLUMN_NAME = 'admission_type'"
+  );
+  if (Number(admCol?.cnt) === 0) {
+    console.log("🔧 Adding admission_type, index_number, current_level columns to applications...");
+    await db.query("ALTER TABLE applications ADD COLUMN admission_type VARCHAR(30) NULL AFTER track_year");
+    await db.query("ALTER TABLE applications ADD COLUMN index_number VARCHAR(80) NULL AFTER admission_type");
+    await db.query("ALTER TABLE applications ADD COLUMN current_level VARCHAR(50) NULL AFTER index_number");
+    console.log("✔ admission_type, index_number, current_level columns added.");
+  }
+
+  // Extend status ENUM to include under_review and info_required
+  const [[statusCol]] = await db.query(
+    "SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'applications' AND COLUMN_NAME = 'status'"
+  );
+  if (statusCol && !statusCol.COLUMN_TYPE.includes("under_review")) {
+    console.log("🔧 Extending applications status ENUM...");
+    await db.query(
+      "ALTER TABLE applications MODIFY COLUMN status ENUM('pending','under_review','approved','rejected','info_required') NOT NULL DEFAULT 'pending'"
+    );
+    console.log("✔ Applications status ENUM extended.");
+  }
+
+  // Add under_review_message and info_required_message to feedback templates
+  const [[urCol]] = await db.query(
+    "SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'application_feedback_templates' AND COLUMN_NAME = 'under_review_message'"
+  );
+  if (Number(urCol?.cnt) === 0) {
+    console.log("🔧 Adding under_review_message and info_required_message to feedback templates...");
+    await db.query("ALTER TABLE application_feedback_templates ADD COLUMN under_review_message TEXT NOT NULL DEFAULT '' AFTER rejected_message");
+    await db.query("ALTER TABLE application_feedback_templates ADD COLUMN info_required_message TEXT NOT NULL DEFAULT '' AFTER under_review_message");
+    console.log("✔ Feedback template columns added.");
+  }
+}
+
 async function runMigrations() {
   await runAboutHistoryMigration();
   await runGalleryMigration();
@@ -532,6 +573,7 @@ async function runMigrations() {
   await runSchoolClassEnumMigration();
   await runGradingSystemMigration();
   await runAuditLogMigration();
+  await runAdmissionTypeMigration();
 
   const [cols] = await db.query(
     "SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'site_content' AND COLUMN_NAME = 'allow_student_register'"

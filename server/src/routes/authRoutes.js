@@ -1,4 +1,4 @@
-const express = require("express");
+﻿const express = require("express");
 const pool = require("../db");
 const { hashPassword, verifyPassword } = require("../utils/password");
 const { signToken, requireAdmin, requireTeacher, requireStudent } = require("../middleware/auth");
@@ -162,7 +162,7 @@ router.post("/teacher/login", async (req, res) => {
   res.json({ token, teacher: teacherAccountPublic(account) });
 });
 
-// Public self-registration — only accepted while an admin has turned this
+// Public self-registration â€” only accepted while an admin has turned this
 // on via Settings > Self-Registration (allow_teacher_register on
 // site_content). Each new account starts 'deactivated' by default, unless the
 // admin has enabled auto-activation for teachers (auto_activate_teacher_register),
@@ -255,7 +255,7 @@ router.post("/student/login", async (req, res) => {
   res.json({ token, student: studentAccountPublic(account) });
 });
 
-// Public self-registration — only accepted while an admin has turned this
+// Public self-registration â€” only accepted while an admin has turned this
 // on via Settings > Self-Registration (allow_student_register on
 // site_content). Each new account starts 'deactivated' by default, unless the
 // admin has enabled auto-activation for students (auto_activate_student_register),
@@ -329,4 +329,116 @@ router.get("/student/me", requireStudent, async (req, res) => {
   res.json(studentAccountPublic(rows[0]));
 });
 
+
+// Self-service: update own profile fields (full_name, email, school_class).
+// Email must be unique across all student accounts.
+router.put("/student/profile", requireStudent, async (req, res) => {
+  const { fullName, email, schoolClass } = req.body || {};
+  const id = req.auth.id;
+
+  const [rows] = await pool.query("SELECT * FROM student_accounts WHERE id = ?", [id]);
+  if (!rows[0]) return res.status(404).json({ error: "Account not found." });
+
+  const updates = {};
+  const params = [];
+
+  if (fullName !== undefined) {
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      return res.status(400).json({ error: "Full name must be at least 2 characters." });
+    }
+    updates.full_name = fullName.trim();
+    params.push(fullName.trim());
+  }
+
+  if (email !== undefined) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!EMAIL_RE.test(normalizedEmail)) {
+      return res.status(400).json({ error: "Enter a valid email address." });
+    }
+    const [existing] = await pool.query(
+      "SELECT id FROM student_accounts WHERE email = ? AND id != ?",
+      [normalizedEmail, id]
+    );
+    if (existing.length > 0) {
+      return res.status(409).json({ error: "This email is already used by another account." });
+    }
+    updates.email = normalizedEmail;
+    params.push(normalizedEmail);
+  }
+
+  if (schoolClass !== undefined) {
+    if (!SCHOOL_CLASS_VALUES.includes(schoolClass)) {
+      return res.status(400).json({ error: "Please choose a valid class." });
+    }
+    updates.school_class = schoolClass;
+    params.push(schoolClass);
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: "No changes provided." });
+  }
+
+  const setClauses = Object.keys(updates).map((col) => `${col} = ?`).join(", ");
+  params.push(id);
+  await pool.query(`UPDATE student_accounts SET ${setClauses} WHERE id = ?`, params);
+
+  const [updated] = await pool.query("SELECT * FROM student_accounts WHERE id = ?", [id]);
+  res.json(studentAccountPublic(updated[0]));
+});
+
+// Self-service: update own profile fields (full_name, email, subject).
+// Email must be unique across all teacher accounts.
+router.put("/teacher/profile", requireTeacher, async (req, res) => {
+  const { fullName, email, subject } = req.body || {};
+  const id = req.auth.id;
+
+  const [rows] = await pool.query("SELECT * FROM teacher_accounts WHERE id = ?", [id]);
+  if (!rows[0]) return res.status(404).json({ error: "Account not found." });
+
+  const updates = {};
+  const params = [];
+
+  if (fullName !== undefined) {
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      return res.status(400).json({ error: "Full name must be at least 2 characters." });
+    }
+    updates.full_name = fullName.trim();
+    params.push(fullName.trim());
+  }
+
+  if (email !== undefined) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!EMAIL_RE.test(normalizedEmail)) {
+      return res.status(400).json({ error: "Enter a valid email address." });
+    }
+    const [existing] = await pool.query(
+      "SELECT id FROM teacher_accounts WHERE email = ? AND id != ?",
+      [normalizedEmail, id]
+    );
+    if (existing.length > 0) {
+      return res.status(409).json({ error: "This email is already used by another account." });
+    }
+    updates.email = normalizedEmail;
+    params.push(normalizedEmail);
+  }
+
+  if (subject !== undefined) {
+    if (!subject.trim()) {
+      return res.status(400).json({ error: "Subject cannot be empty." });
+    }
+    updates.subject = subject.trim();
+    params.push(subject.trim());
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: "No changes provided." });
+  }
+
+  const setClauses = Object.keys(updates).map((col) => `${col} = ?`).join(", ");
+  params.push(id);
+  await pool.query(`UPDATE teacher_accounts SET ${setClauses} WHERE id = ?`, params);
+
+  const [updated] = await pool.query("SELECT * FROM teacher_accounts WHERE id = ?", [id]);
+  res.json(teacherAccountPublic(updated[0]));
+});
 module.exports = router;

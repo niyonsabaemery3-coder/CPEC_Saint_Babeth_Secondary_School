@@ -1,4 +1,4 @@
-// Every class/track offered at CPEC Saint Babeth TSS — kept in sync by hand
+﻿// Every class/track offered at CPEC Saint Babeth TSS — kept in sync by hand
 // with src/constants/academics.ts on the frontend. Update both together.
 const SCHOOL_CLASS_VALUES = [
   "S1",
@@ -10,6 +10,11 @@ const SCHOOL_CLASS_VALUES = [
   "L3MRT",
   "L4MRT",
   "L5MRT",
+  "L3MLT",
+  "L4MLT",
+  "L5MLT",
+  "SC_SOD",
+  "SC_MLT",
   "OTHER",
 ];
 
