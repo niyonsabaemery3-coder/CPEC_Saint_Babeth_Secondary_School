@@ -59,7 +59,7 @@ export default function AddResourceView({ onDone }: AddResourceViewProps) {
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const sizeErr = validateMaxFileSizeMB(file, 20, "Resource file");
+    const sizeErr = validateMaxFileSizeMB(file, 10, "Resource file");
     if (sizeErr) {
       setErrors((er) => ({ ...er, file: sizeErr }));
       setFileName(null);

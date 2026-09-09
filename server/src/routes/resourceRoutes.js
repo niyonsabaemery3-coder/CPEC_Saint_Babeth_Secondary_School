@@ -4,8 +4,13 @@ const { optionalAuth, requireTeacher, requireAdminOrTeacher } = require("../midd
 const { saveBase64File, deleteUploadedFile } = require("../utils/uploads");
 const { toAbsoluteUploadUrl } = require("../utils/publicUrl");
 const { SCHOOL_CLASS_VALUES } = require("../constants/academics");
+const { logAction } = require("../utils/audit");
 
 const router = express.Router();
+
+function actorName(auth) {
+  return auth.username || auth.email || auth.fullName || null;
+}
 
 // Any logged-in account (student, teacher or admin) unlocks the real file/
 // link. Anonymous visitors only ever see the resource's metadata — the
@@ -90,6 +95,17 @@ router.post("/", requireTeacher, async (req, res) => {
   );
 
   const [rows] = await pool.query(`${BASE_QUERY} WHERE r.id = ?`, [insertId]);
+
+  await logAction({
+    actorRole: req.auth.role,
+    actorId: req.auth.id,
+    actorName: actorName(req.auth),
+    action: "create",
+    entityType: "resource",
+    entityId: insertId,
+    details: { title: title.trim(), hasFile: !!fileUrl },
+  });
+
   res.status(201).json(toPublic(req, rows[0], true));
 });
 
@@ -120,16 +136,30 @@ router.put("/:id", requireAdminOrTeacher, async (req, res, next) => {
     // existing file_url/file_name exactly as they were.
     let fileUrl = resource.file_url;
     let finalFileName = resource.file_name;
+    let fileReplaced = false;
     if (fileData) {
       fileUrl = await saveBase64File(fileData, "resources", fileName);
       finalFileName = fileName || null;
-      if (resource.file_url) await deleteUploadedFile(resource.file_url).catch(() => {});
+      if (resource.file_url) {
+        await deleteUploadedFile(resource.file_url).catch(() => {});
+        fileReplaced = true;
+      }
     }
 
     await pool.query(
       "UPDATE resources SET title = ?, subject = ?, school_class = ?, type = ?, file_url = ?, file_name = ?, link_url = ? WHERE id = ?",
       [title.trim(), subject.trim(), schoolClass, type, fileUrl, fileUrl ? finalFileName : null, link?.trim() || null, req.params.id]
     );
+
+    await logAction({
+      actorRole: req.auth.role,
+      actorId: req.auth.id,
+      actorName: actorName(req.auth),
+      action: "update",
+      entityType: "resource",
+      entityId: req.params.id,
+      details: { title: title.trim(), fileReplaced },
+    });
 
     const [updated] = await pool.query(`${BASE_QUERY} WHERE r.id = ?`, [req.params.id]);
     res.json(toPublic(req, updated[0], true));
@@ -150,6 +180,17 @@ router.delete("/:id", requireAdminOrTeacher, async (req, res) => {
 
   if (resource.file_url) await deleteUploadedFile(resource.file_url);
   await pool.query("DELETE FROM resources WHERE id = ?", [req.params.id]);
+
+  await logAction({
+    actorRole: req.auth.role,
+    actorId: req.auth.id,
+    actorName: actorName(req.auth),
+    action: "delete",
+    entityType: "resource",
+    entityId: req.params.id,
+    details: { title: resource.title },
+  });
+
   res.json({ message: "Resource deleted." });
 });
 

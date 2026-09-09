@@ -48,6 +48,7 @@ const markRoutes = require("./routes/markRoutes");
 
 const auditRoutes = require("./routes/auditRoutes");
 const contactRoutes = require("./routes/contactRoutes");
+const fileRoutes = require("./routes/fileRoutes");
 
 const app = express();
 
@@ -58,12 +59,45 @@ app.set("trust proxy", 1);
 // crossOriginResourcePolicy is relaxed to "cross-origin" so that images/uploads
 // served from this API can still be loaded by a frontend on a different origin.
 
+// The primary production deployment serves the SPA from a separate static
+// host (GitHub Pages), which hardens itself via the <meta http-equiv="CSP">
+// tag injected at build time (see vite.config.ts). This header is a
+// defense-in-depth backstop for setups where Express itself serves `dist/`
+// (e.g. the alternative all-in-one Clever Cloud deployment) and is harmless
+// on plain JSON API responses either way.
+const supabaseOrigin = process.env.SUPABASE_URL
+  ? new URL(process.env.SUPABASE_URL).origin
+  : "https://*.supabase.co";
+
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
-    contentSecurityPolicy: false, // the SPA is served separately (or via its own CSP); avoid double-restricting here
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+        imgSrc: ["'self'", "data:", "blob:", supabaseOrigin],
+        connectSrc: ["'self'", supabaseOrigin],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+      },
+    },
   })
 );
+
+// The app never uses camera/mic/geolocation/payment APIs — deny them outright
+// so an XSS payload (or a compromised third-party script) can't invoke them.
+app.use((_req, res, next) => {
+  res.setHeader(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+  );
+  next();
+});
 
 // ---------- PERFORMANCE: gzip/brotli-style compression for all responses ----------
 
@@ -127,8 +161,19 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "15mb" }));
+// 11 MB JSON limit — slightly above the 10 MB file upload limit so the
+// base64-encoded payload (which adds ~33% overhead) fits within this budget.
+// The 10 MB cap is enforced client-side before encoding; this acts as the
+// final server-side backstop.
+app.use(express.json({ limit: "11mb" }));
 
+// Sensitive local-fallback uploads (student reports, application feedback
+// attachments — see utils/uploads.js PRIVATE_CATEGORIES) live under
+// uploads/private/ specifically so they can be excluded here. They are only
+// ever reachable through the short-lived signed link issued by
+// /api/files/signed (see routes/fileRoutes.js), never through this static
+// mount, which has no access control of its own.
+app.use("/uploads/private", (_req, res) => res.status(403).json({ error: "Forbidden" }));
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 const distDir = path.join(__dirname, "../../dist");
@@ -186,6 +231,7 @@ app.use("/api/marks", markRoutes);
 
 app.use("/api/audit-logs", auditRoutes);
 app.use("/api/contact", contactRoutes);
+app.use("/api/files", fileRoutes);
 
 // Client-side routes the SPA actually handles (kept in sync with src/App.tsx).
 // A request for anything else is a genuine 404 — even though we still need
@@ -223,12 +269,20 @@ app.use((req, res) => {
 app.use((err, _req, res, _next) => {
   console.error(err);
 
+  // Known, safe-to-show client errors (e.g. UploadValidationError from
+  // utils/uploads.js) carry their own status and a message that is already
+  // written to be user-facing — pass those through as-is. Anything else is
+  // an unexpected server-side failure, so its message is only shown when
+  // DEBUG=true to avoid leaking internals (stack traces, SQL, file paths).
+  const status = Number.isInteger(err.status) ? err.status : 500;
   const message =
-    process.env.DEBUG === "true"
-      ? err.message || "Something went wrong on the server."
-      : "Something went wrong on the server.";
+    status < 500
+      ? err.message || "Invalid request."
+      : process.env.DEBUG === "true"
+        ? err.message || "Something went wrong on the server."
+        : "Something went wrong on the server.";
 
-  res.status(500).json({
+  res.status(status).json({
     error: message,
   });
 });
@@ -567,6 +621,62 @@ async function runApplicationsTableEnsureColumns() {
     console.log("✔ applications.status ENUM extended.");
   }
 }
+async function runProgramImageMigration() {
+  // Adds image_url column to programs table for per-card background images.
+  const [[row]] = await db.query(
+    "SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'programs' AND COLUMN_NAME = 'image_url'"
+  );
+  if (Number(row?.cnt) === 0) {
+    console.log("🔧 Adding image_url column to programs...");
+    await db.query("ALTER TABLE programs ADD COLUMN image_url VARCHAR(500) NULL AFTER section");
+    console.log("✔ programs.image_url added.");
+  }
+}
+
+async function runApplicationsIndexMigration() {
+  // Adds indexes to the applications table for columns used in the public
+  // tracking lookup and admin filtering. Without these, every tracking request
+  // does a full table scan. Safe to run multiple times — checks first.
+
+  const indexesToCreate = [
+    {
+      name: "idx_applications_phone1",
+      sql: "ALTER TABLE applications ADD INDEX idx_applications_phone1 (phone1)",
+    },
+    {
+      name: "idx_applications_phone2",
+      sql: "ALTER TABLE applications ADD INDEX idx_applications_phone2 (phone2)",
+    },
+    {
+      name: "idx_applications_parent_email",
+      sql: "ALTER TABLE applications ADD INDEX idx_applications_parent_email (parent_email)",
+    },
+    {
+      name: "idx_applications_status",
+      sql: "ALTER TABLE applications ADD INDEX idx_applications_status (status)",
+    },
+    {
+      name: "idx_applications_created_at",
+      sql: "ALTER TABLE applications ADD INDEX idx_applications_created_at (created_at)",
+    },
+  ];
+
+  for (const { name, sql } of indexesToCreate) {
+    try {
+      const [[row]] = await db.query(
+        `SELECT COUNT(*) AS cnt FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'applications' AND INDEX_NAME = ?`,
+        [name]
+      );
+      if (Number(row?.cnt) === 0) {
+        console.log(`🔧 Adding index ${name}...`);
+        await db.query(sql);
+        console.log(`✔ ${name} added.`);
+      }
+    } catch { /* skip — index may already exist or column may not exist yet */ }
+  }
+}
+
 async function runAdmissionTypeMigration() {
   // Extends the status ENUM and adds under_review/info_required feedback
   // template columns — for databases created before the Admission Request
@@ -627,6 +737,8 @@ async function runMigrations() {
   await runSchoolClassEnumMigration();
   await runGradingSystemMigration();
   await runAuditLogMigration();
+  await runProgramImageMigration();
+  await runApplicationsIndexMigration();
   await runAdmissionTypeMigration();
 
   const [cols] = await db.query(

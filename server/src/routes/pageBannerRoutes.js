@@ -3,8 +3,13 @@ const pool = require("../db");
 const { requireAdmin } = require("../middleware/auth");
 const { saveBase64File, deleteUploadedFile } = require("../utils/uploads");
 const { toAbsoluteUploadUrl, toRelativeUploadPath } = require("../utils/publicUrl");
+const { logAction } = require("../utils/audit");
 
 const router = express.Router();
+
+function actorName(auth) {
+  return auth.username || auth.email || null;
+}
 
 // The only pages that have a "card page-banner". Kept as an allow-list so a
 // bad/typo'd page key can never create a stray row.
@@ -57,7 +62,18 @@ router.put("/:pageKey", requireAdmin, async (req, res, next) => {
       [pageKey, b.eyebrow || "", b.title || "", b.subtitle || "", bgImage || null]
     );
 
-    if (bgImage !== oldBgImage && oldBgImage) await deleteUploadedFile(oldBgImage).catch(() => {});
+    const bgImageReplaced = bgImage !== oldBgImage && oldBgImage;
+    if (bgImageReplaced) await deleteUploadedFile(oldBgImage).catch(() => {});
+
+    await logAction({
+      actorRole: "admin",
+      actorId: req.auth.id,
+      actorName: actorName(req.auth),
+      action: "update",
+      entityType: "page_banner",
+      entityId: pageKey,
+      details: { pageKey, bgImageReplaced: !!bgImageReplaced },
+    });
 
     res.json({
       eyebrow: b.eyebrow || "",

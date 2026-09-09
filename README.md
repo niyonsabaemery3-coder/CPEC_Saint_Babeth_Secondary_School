@@ -123,7 +123,7 @@ server/                         (backend — see server/README.md for full setup
   src/routes/                   auth, teachers, teacher-accounts, resources, applications, faqs, site
   src/middleware/auth.js        JWT-based auth (admin / teacher roles)
   src/utils/                    password hashing, base64 file uploads, absolute URL helpers
-  uploads/                      resource files, application reports & site images saved to disk here
+  uploads/                      local-dev only fallback — in production, Supabase Storage is used instead
 ```
 
 ## How data works now (MySQL-backed, shared across everyone)
@@ -144,11 +144,20 @@ every visitor and every device sees the same teachers, resources, applications, 
 - `theme` (light/dark) — the only thing still kept locally per-browser, since it's a personal display
   preference rather than site content.
 
-Uploaded files (resource PDFs/slides, application reports, site images) are saved to disk on the API server
-under `server/uploads/` and served back as normal URLs — not stored as giant blobs in the database.
+Uploaded files (resource PDFs/slides, application reports, site images) are stored in **Supabase Storage**
+when `SUPABASE_URL` and `SUPABASE_SECRET_KEY` are configured in `server/.env` — the recommended production
+setup. Without those env vars the server falls back to local disk (`server/uploads/`), which is suitable
+for local development only (Render and similar hosts do not have a persistent local filesystem).
 
-See Admin → Settings → **Data & Storage** for a live summary of this, and `server/README.md` for schema
-details, deployment, and how to reset to demo data.
+File references (URLs or storage keys) are stored in the database; the actual binary content lives in
+storage, not in MySQL.
+
+**Private files** (student reports, application report uploads) are served as short-lived signed URLs
+(1-hour expiry) rather than permanent public links, so the actual file is only accessible to the
+authenticated user for the duration of their session.
+
+See Admin → Settings → **Data & Storage** for a live summary of the active provider and total managed
+files, and `server/.env.example` for required environment variables.
 
 ## Admin access
 

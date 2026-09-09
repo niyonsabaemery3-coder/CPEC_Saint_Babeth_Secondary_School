@@ -3,6 +3,7 @@ import type {
   Teacher,
   StudentApplication,
   Faq,
+  ProgramCard,
   SiteContent,
   GalleryItem,
   AdminView,
@@ -220,6 +221,9 @@ interface AppContextValue {
     section: "home" | "about" | "academics" | "gallery" | "contact",
     payload: Partial<SiteContent>
   ) => Promise<void>;
+  addProgram: (p: Omit<ProgramCard, "id">) => Promise<void>;
+  updateProgram: (id: number, p: Omit<ProgramCard, "id">) => Promise<void>;
+  deleteProgram: (id: number) => Promise<void>;
   // Toggles whether the public Login modals show a "Register" tab. Persists
   // to the backend (PUT /api/site/registration, admin-only).
   updateRegistrationSettings: (payload: Partial<RegistrationSettings>) => Promise<void>;
@@ -581,6 +585,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   ) => {
     const saved = await api.put<SiteContent>(`/api/site/${section}`, payload, "admin");
     setSiteState((prev) => ({ ...prev, ...saved }));
+  };
+
+  const addProgram = async (p: Omit<ProgramCard, "id">) => {
+    const saved = await api.post<ProgramCard>("/api/site/programs", p, "admin");
+    setSiteState((prev) => ({ ...prev, programs: [...prev.programs, saved] }));
+  };
+
+  const updateProgram = async (id: number, p: Omit<ProgramCard, "id">) => {
+    const saved = await api.put<ProgramCard>(`/api/site/programs/${id}`, p, "admin");
+    setSiteState((prev) => ({ ...prev, programs: prev.programs.map((prog) => (prog.id === id ? saved : prog)) }));
+  };
+
+  const deleteProgram = async (id: number) => {
+    await api.delete(`/api/site/programs/${id}`, "admin");
+    setSiteState((prev) => ({ ...prev, programs: prev.programs.filter((prog) => prog.id !== id) }));
   };
 
   // Adds ONE new gallery photo (POST /api/site/gallery). Only appends the
@@ -1035,6 +1054,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     siteLoaded,
     setSite,
     saveSiteSection,
+    addProgram,
+    updateProgram,
+    deleteProgram,
     updateRegistrationSettings,
     addGalleryPhoto,
     updateGalleryPhoto,

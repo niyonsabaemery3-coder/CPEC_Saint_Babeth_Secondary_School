@@ -19,7 +19,7 @@ Set these in **Environment > Environment variables**:
 
 | Variable | Value |
 |----------|-------|
-| `JWT_SECRET` | `9f2c4a7e1b08d6f3a5e2c9b4d7a1f8e6c3b0a9d2e5f8c1a4b7d0e3f6a9c2b5e8` |
+| `JWT_SECRET` | Generate your own — never reuse a value from documentation. Run: `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"` and paste the output here. |
 | `CORS_ORIGIN` | Your frontend's origin (e.g. GitHub Pages URL or Render URL) |
 | `PUBLIC_API_URL` | The public URL of this API |
 

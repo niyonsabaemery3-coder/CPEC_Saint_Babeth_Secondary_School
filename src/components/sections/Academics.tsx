@@ -1,12 +1,8 @@
-import { useRef } from "react";
+﻿import { useRef } from "react";
 import { useApp } from "../../context/AppContext";
 import { useFadeUp } from "../../hooks/useScrollAnimations";
 
 interface AcademicsProps {
-  // Homepage preview mode: shows only the program cards (the most important
-  // category info) and skips the technology-track strip below, so the full
-  // curriculum detail lives only on the dedicated /academics page — see
-  // AcademicsPage.tsx, which renders this same component with no prop.
   teaser?: boolean;
 }
 
@@ -18,19 +14,30 @@ export default function Academics({ teaser = false }: AcademicsProps) {
   return (
     <section id="academics" className="card" ref={ref}>
       <div className="section-head">
-        <div className="eyebrow">
-          <span className="bar" /> Academics
-        </div>
+        <div className="eyebrow"><span className="bar" /> Academics</div>
         <h2>What we teach</h2>
         <p>A well-rounded lower-secondary curriculum paired with in-demand technology skills.</p>
       </div>
 
       <div className="prog-grid">
         {site.programs.map((p, i) => (
-          <div className="prog-card" key={i}>
-            <span className="tag">{p.section || "Ordinary Level"}</span>
-            <h3>{p.title}</h3>
-            <p>{p.desc}</p>
+          <div className={`prog-card${p.img ? " has-img" : ""}`} key={p.id ?? i} style={{ position: "relative", overflow: "hidden", minHeight: "200px" }}>
+            {/* Background image — reveals on hover via clip-path, same as news cards */}
+            {p.img && (
+              <>
+                <div
+                  className="en-nc-img"
+                  style={{ backgroundImage: `url('${p.img}')` }}
+                />
+                <div className="en-nc-overlay" />
+              </>
+            )}
+            {/* Card content — sits above the image */}
+            <div style={{ position: "relative", zIndex: 2 }}>
+              <span className="tag">{p.section || "Ordinary Level"}</span>
+              <h3>{p.title}</h3>
+              <p>{p.desc}</p>
+            </div>
           </div>
         ))}
       </div>

@@ -103,10 +103,28 @@ See `src/schema.sql` for the exact SQL. Summary of tables and how they relate:
 
 ## 6. File uploads
 
-Resource files, application reports, and site images are sent from the frontend as base64, then decoded and
-saved to disk under `server/uploads/<category>/` (not stored in the database — only their URL is). They're
-served back at `http://<api-host>/uploads/<category>/<file>`. Set `PUBLIC_API_URL` in `.env` if the API sits
-behind a reverse proxy/CDN and needs a specific public URL for these links.
+Resource files, application reports/feedback, and site images are sent from the frontend as base64, validated
+server-side (type + 10 MB max — see `src/utils/uploads.js`), then routed to **Supabase Storage**, which is the
+only storage backend supported in production:
+
+- **Public files** (gallery/hero/banner/teacher images, public learning resources) go to the bucket named by
+  `SUPABASE_BUCKET` (default `uploads`) and get a permanent public URL.
+- **Private files** (student reports, admission report/feedback attachments — anything a specific person
+  shouldn't be able to share a forever-link to) go to a **separate** bucket named by `SUPABASE_PRIVATE_BUCKET`
+  (default `private`), which must be created in the Supabase dashboard **without** the "Public bucket" toggle.
+  These are only ever handed to the frontend as a short-lived (1 hour) signed URL, generated on demand — never
+  a permanent link, and never stored as one in the database (the DB stores an internal `supabase-private:<key>`
+  reference instead).
+
+If `SUPABASE_URL`/`SUPABASE_SECRET_KEY` are not set, uploads fall back to local disk under
+`server/uploads/<category>/` (public) or `server/uploads/private/<category>/` (private, served only through a
+short-lived signed link at `/api/files/signed`, never through the plain `/uploads/` static route). **This
+fallback is for local development only** — most hosts (Render, Clever Cloud, etc.) don't persist the local
+filesystem across redeploys, so configure Supabase Storage before deploying. Set `PUBLIC_API_URL` in `.env` if
+the API sits behind a reverse proxy/CDN and needs a specific public URL for these links.
+
+Cloudflare R2 (`src/utils/r2.js`) is kept in the codebase **only** to clean up objects created under an older
+setup that used it — new uploads never write to R2 anymore.
 
 ## 7. Deploying
 

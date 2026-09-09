@@ -3,8 +3,13 @@ const pool = require("../db");
 const { requireAdmin } = require("../middleware/auth");
 const { saveBase64File, deleteUploadedFile } = require("../utils/uploads");
 const { toAbsoluteUploadUrl, toRelativeUploadPath } = require("../utils/publicUrl");
+const { logAction } = require("../utils/audit");
 
 const router = express.Router();
+
+function actorName(auth) {
+  return auth.username || auth.email || null;
+}
 
 // Kept as an allow-list so a bad/typo'd color key can never be stored.
 const COLOR_KEYS = ["navy", "green", "gold", "purple", "rust"];
@@ -67,6 +72,17 @@ router.post("/", requireAdmin, async (req, res, next) => {
     );
 
     const [rows] = await pool.query("SELECT * FROM upcoming_events WHERE id = ?", [insertId]);
+
+    await logAction({
+      actorRole: "admin",
+      actorId: req.auth.id,
+      actorName: actorName(req.auth),
+      action: "create",
+      entityType: "upcoming_event",
+      entityId: insertId,
+      details: { title: title.trim(), hasImage: !!imageUrl },
+    });
+
     res.status(201).json(toPublic(req, rows[0]));
   } catch (err) {
     next(err);
@@ -111,7 +127,18 @@ router.put("/:id", requireAdmin, async (req, res, next) => {
       ]
     );
 
-    if (imageUrl !== oldImage && oldImage) await deleteUploadedFile(oldImage).catch(() => {});
+    const imageReplaced = imageUrl !== oldImage && oldImage;
+    if (imageReplaced) await deleteUploadedFile(oldImage).catch(() => {});
+
+    await logAction({
+      actorRole: "admin",
+      actorId: req.auth.id,
+      actorName: actorName(req.auth),
+      action: "update",
+      entityType: "upcoming_event",
+      entityId: req.params.id,
+      details: { title: title.trim(), imageReplaced: !!imageReplaced },
+    });
 
     const [rows] = await pool.query("SELECT * FROM upcoming_events WHERE id = ?", [req.params.id]);
     res.json(toPublic(req, rows[0]));
@@ -126,6 +153,17 @@ router.delete("/:id", requireAdmin, async (req, res, next) => {
     const [rows] = await pool.query("SELECT * FROM upcoming_events WHERE id = ?", [req.params.id]);
     if (rows[0]?.image_url) await deleteUploadedFile(rows[0].image_url).catch(() => {});
     await pool.query("DELETE FROM upcoming_events WHERE id = ?", [req.params.id]);
+
+    await logAction({
+      actorRole: "admin",
+      actorId: req.auth.id,
+      actorName: actorName(req.auth),
+      action: "delete",
+      entityType: "upcoming_event",
+      entityId: req.params.id,
+      details: rows[0] ? { title: rows[0].title } : null,
+    });
+
     res.json({ message: "Event deleted." });
   } catch (err) {
     next(err);

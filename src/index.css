@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 /* =========================================================
    CPEC Saint Babeth Secondary School — Design System
@@ -547,8 +547,37 @@
   .prog-card{
         background: linear-gradient(145deg, rgb(189 187 183 / 13%), rgb(32 34 42 / 13%)); border:1px solid var(--line-soft); border-radius:var(--r-md); padding:28px 24px;
     transition:.35s var(--ease); box-shadow:var(--shadow-sm);
+    /* Skips layout/paint work for off-screen cards (their background-image
+       is not requested by the browser until the card nears the viewport) —
+       a CSS-only equivalent of image lazy-loading for background images,
+       which don't support the loading="lazy" attribute. */
+    content-visibility:auto; contain-intrinsic-size:260px;
   }
   .prog-card:hover{transform:translateY(-6px); box-shadow:var(--shadow-md); border-color:rgba(230,169,53,.3);}
+  /* -- prog-card: image hover reveal (same animation as news cards) ---------- */
+  /* When a background image has been set (admin uploads one), the card gets
+     the 'has-img' class. On hover: image expands from diamond, overlay fades
+     in, text turns white — identical to the news card hover pattern.          */
+  .prog-card.has-img .en-nc-img{
+    clip-path:polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%);
+    transition:clip-path .65s cubic-bezier(.22,1,.36,1), transform .65s cubic-bezier(.22,1,.36,1);
+    transform:scale(1.08);
+    will-change:clip-path, transform;
+  }
+  .prog-card.has-img:hover .en-nc-img{
+    clip-path:polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);
+    transform:scale(1);
+  }
+  .prog-card.has-img .en-nc-overlay{
+    position:absolute; inset:0;
+    background:linear-gradient(to top, rgba(0,0,0,.80) 0%, rgba(0,0,0,.52) 45%, rgba(0,0,0,.16) 100%);
+    opacity:0; transition:opacity .55s var(--ease); pointer-events:none; z-index:1;
+  }
+  .prog-card.has-img:hover .en-nc-overlay{ opacity:1; }
+  .prog-card.has-img:hover .tag{ color:#fff; background:rgba(255,255,255,.18); }
+  .prog-card.has-img:hover h3{ color:#fff; }
+  .prog-card.has-img:hover p{ color:rgba(255,255,255,.82); }
+
   .prog-card .tag{
     display:inline-block; font-size:10.5px; font-weight:800; letter-spacing:.5px; color:#ff9d00;
     background:#c0b7a02b; padding:5px 12px; border-radius:var(--r-pill); margin-bottom:14px; text-transform:uppercase;
@@ -1960,6 +1989,9 @@
     min-height:220px;
     transition:border-color .35s var(--ease), box-shadow .35s var(--ease), transform .35s var(--ease);
     cursor:default;
+    /* Off-screen news/event cards skip layout+paint until near the
+       viewport, deferring their background-image fetch — see .prog-card. */
+    content-visibility:auto; contain-intrinsic-size:220px;
   }
   .en-news-card:hover{
     border-color:var(--gold);

@@ -3,8 +3,13 @@ const pool = require("../db");
 const { requireAdmin } = require("../middleware/auth");
 const { saveBase64File, deleteUploadedFile } = require("../utils/uploads");
 const { toAbsoluteUploadUrl, toRelativeUploadPath } = require("../utils/publicUrl");
+const { logAction } = require("../utils/audit");
 
 const router = express.Router();
+
+function actorName(auth) {
+  return auth.username || auth.email || null;
+}
 
 function toPublic(req, row) {
   return {
@@ -37,6 +42,17 @@ router.post("/", requireAdmin, async (req, res) => {
   );
 
   const [rows] = await pool.query("SELECT * FROM teachers WHERE id = ?", [insertId]);
+
+  await logAction({
+    actorRole: "admin",
+    actorId: req.auth.id,
+    actorName: actorName(req.auth),
+    action: "create",
+    entityType: "teacher",
+    entityId: insertId,
+    details: { name: name.trim(), subject: subject.trim(), hasPhoto: !!photoUrl },
+  });
+
   res.status(201).json(toPublic(req, rows[0]));
 });
 
@@ -61,7 +77,18 @@ router.put("/:id", requireAdmin, async (req, res, next) => {
       [name.trim(), subject.trim(), quote?.trim() || "Passionate about helping students grow.", photoUrl, color || existing.color, id]
     );
 
-    if (photoUrl !== existing.photo_url && existing.photo_url) await deleteUploadedFile(existing.photo_url).catch(() => {});
+    const photoReplaced = photoUrl !== existing.photo_url && existing.photo_url;
+    if (photoReplaced) await deleteUploadedFile(existing.photo_url).catch(() => {});
+
+    await logAction({
+      actorRole: "admin",
+      actorId: req.auth.id,
+      actorName: actorName(req.auth),
+      action: "update",
+      entityType: "teacher",
+      entityId: id,
+      details: { name: name.trim(), subject: subject.trim(), photoReplaced: !!photoReplaced },
+    });
 
     const [rows] = await pool.query("SELECT * FROM teachers WHERE id = ?", [id]);
     res.json(toPublic(req, rows[0]));
@@ -75,6 +102,17 @@ router.delete("/:id", requireAdmin, async (req, res) => {
   const [rows] = await pool.query("SELECT * FROM teachers WHERE id = ?", [req.params.id]);
   if (rows[0]?.photo_url) await deleteUploadedFile(rows[0].photo_url);
   await pool.query("DELETE FROM teachers WHERE id = ?", [req.params.id]);
+
+  await logAction({
+    actorRole: "admin",
+    actorId: req.auth.id,
+    actorName: actorName(req.auth),
+    action: "delete",
+    entityType: "teacher",
+    entityId: req.params.id,
+    details: rows[0] ? { name: rows[0].name, subject: rows[0].subject } : null,
+  });
+
   res.json({ message: "Teacher removed." });
 });
 

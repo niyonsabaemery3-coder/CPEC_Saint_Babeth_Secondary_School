@@ -1,17 +1,17 @@
 /**
  * Finds and deletes files sitting in Supabase Storage that no row in the
- * database points to anymore ("orphaned" uploads).
+ * database points to anymore ("orphaned" uploads). Covers BOTH buckets:
+ *   - the public bucket (SUPABASE_BUCKET)         — gallery/hero/teacher/
+ *     resource images and public learning resources.
+ *   - the private bucket (SUPABASE_PRIVATE_BUCKET) — student reports,
+ *     admission report/feedback attachments.
  *
- * Why these pile up: for a long time, `PUT /api/site` crashed part-way
- * through (missing `deleteUploadedFile` import — fixed now in siteRoutes.js)
- * whenever a gallery photo was removed or replaced, or the hero/about image
- * was changed. The database row was already updated/deleted by the time it
- * crashed, but the matching Supabase Storage file was never cleaned up — so
- * the bucket kept growing with photos the site no longer references, and any
- * OTHER site-content changes in that same save silently failed to persist.
- * That bug is now fixed, so this only needs to be run once to clear out the
- * backlog (safe to re-run any time — it only ever deletes what nothing links
- * to anymore).
+ * Why these pile up: whenever a file is replaced/removed, the old object
+ * should be deleted right after the DB row is safely updated (see
+ * utils/uploads.js#deleteUploadedFile) — but a crash between those two
+ * steps, or a row deleted directly in the database, can still leave an
+ * object with nothing pointing to it. Safe to re-run any time — it only
+ * ever deletes what nothing in the database links to anymore.
  *
  * Usage:
  *   node server/src/scripts/cleanupOrphanedFiles.js            # dry run — lists what WOULD be deleted
@@ -20,8 +20,8 @@
 const pool = require("../db");
 const supabase = require("../utils/supabaseStorage");
 
-async function listAllObjects(prefix = "") {
-  const res = await fetch(`${process.env.SUPABASE_URL.replace(/\/+$/, "")}/storage/v1/object/list/${process.env.SUPABASE_BUCKET || "uploads"}`, {
+async function listAllObjects(bucket, prefix = "") {
+  const res = await fetch(`${process.env.SUPABASE_URL.replace(/\/+$/, "")}/storage/v1/object/list/${bucket}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${process.env.SUPABASE_SECRET_KEY}`,
@@ -37,7 +37,7 @@ async function listAllObjects(prefix = "") {
   for (const entry of entries) {
     // A "folder" placeholder has no id/metadata — recurse into it.
     if (entry.id === null) {
-      keys.push(...(await listAllObjects(prefix ? `${prefix}/${entry.name}` : entry.name)));
+      keys.push(...(await listAllObjects(bucket, prefix ? `${prefix}/${entry.name}` : entry.name)));
     } else {
       keys.push(prefix ? `${prefix}/${entry.name}` : entry.name);
     }
@@ -46,32 +46,66 @@ async function listAllObjects(prefix = "") {
 }
 
 async function referencedKeys() {
-  const urls = new Set();
+  const publicUrls = new Set();
+  const privateRefs = new Set();
+
+  function addRef(value) {
+    if (!value) return;
+    if (value.startsWith("supabase-private:")) privateRefs.add(value);
+    else publicUrls.add(value);
+  }
 
   const [[site]] = await pool.query("SELECT hero_img, about_img FROM site_content WHERE id = 1");
-  if (site?.hero_img) urls.add(site.hero_img);
-  if (site?.about_img) urls.add(site.about_img);
+  addRef(site?.hero_img);
+  addRef(site?.about_img);
 
   const [gallery] = await pool.query("SELECT image_url FROM gallery_items");
-  gallery.forEach((r) => r.image_url && urls.add(r.image_url));
+  gallery.forEach((r) => addRef(r.image_url));
 
   const [teachers] = await pool.query("SELECT photo_url FROM teachers");
-  teachers.forEach((r) => r.photo_url && urls.add(r.photo_url));
+  teachers.forEach((r) => addRef(r.photo_url));
 
   const [resources] = await pool.query("SELECT file_url FROM resources");
-  resources.forEach((r) => r.file_url && urls.add(r.file_url));
+  resources.forEach((r) => addRef(r.file_url));
 
-  const [applications] = await pool.query("SELECT report_file_url FROM applications");
-  applications.forEach((r) => r.report_file_url && urls.add(r.report_file_url));
+  const [applications] = await pool.query("SELECT report_file_url, feedback_file_url FROM applications");
+  applications.forEach((r) => { addRef(r.report_file_url); addRef(r.feedback_file_url); });
 
   const [reports] = await pool.query("SELECT file_url FROM student_reports");
-  reports.forEach((r) => r.file_url && urls.add(r.file_url));
+  reports.forEach((r) => addRef(r.file_url));
 
-  return new Set(
-    Array.from(urls)
-      .map((url) => supabase.keyFromPublicUrl(url))
-      .filter(Boolean)
-  );
+  return {
+    publicKeys: new Set(Array.from(publicUrls).map((url) => supabase.keyFromPublicUrl(url)).filter(Boolean)),
+    privateKeys: new Set(Array.from(privateRefs).map((ref) => supabase.keyFromPrivateRef(ref)).filter(Boolean)),
+  };
+}
+
+async function cleanBucket({ label, bucket, listedKeys, inUseKeys, doDelete, deleteFn }) {
+  console.log(`\n— ${label} bucket ("${bucket}") —`);
+  console.log(`Found ${listedKeys.length} file(s) in storage.`);
+  console.log(`${inUseKeys.size} file(s) are referenced by the database.`);
+
+  const orphaned = listedKeys.filter((key) => !inUseKeys.has(key));
+
+  if (orphaned.length === 0) {
+    console.log("No orphaned files found. This bucket is already clean.");
+    return 0;
+  }
+
+  console.log(`${orphaned.length} orphaned file(s):`);
+  orphaned.forEach((key) => console.log(`  - ${key}`));
+
+  if (!doDelete) {
+    console.log("Dry run — nothing was deleted here. Re-run with --delete to remove these files.");
+    return 0;
+  }
+
+  console.log("Deleting...");
+  for (const key of orphaned) {
+    await deleteFn(key);
+    console.log(`  deleted: ${key}`);
+  }
+  return orphaned.length;
 }
 
 async function run() {
@@ -81,36 +115,44 @@ async function run() {
   }
 
   const doDelete = process.argv.includes("--delete");
+  const publicBucket = process.env.SUPABASE_BUCKET || "uploads";
+  const privateBucket = process.env.SUPABASE_PRIVATE_BUCKET || "private";
 
   console.log("Listing files in Supabase Storage...");
-  const allKeys = await listAllObjects();
-  console.log(`Found ${allKeys.length} file(s) in storage.`);
+  const [publicListed, privateListed] = await Promise.all([
+    listAllObjects(publicBucket),
+    listAllObjects(privateBucket).catch((err) => {
+      console.warn(`Could not list private bucket "${privateBucket}" (it may not exist yet): ${err.message}`);
+      return [];
+    }),
+  ]);
 
   console.log("Checking which ones are still referenced in the database...");
-  const inUse = await referencedKeys();
-  console.log(`${inUse.size} file(s) are referenced by the database.`);
+  const { publicKeys, privateKeys } = await referencedKeys();
 
-  const orphaned = allKeys.filter((key) => !inUse.has(key));
+  let totalDeleted = 0;
+  totalDeleted += await cleanBucket({
+    label: "PUBLIC",
+    bucket: publicBucket,
+    listedKeys: publicListed,
+    inUseKeys: publicKeys,
+    doDelete,
+    deleteFn: (key) => supabase.deleteObject(key),
+  });
+  totalDeleted += await cleanBucket({
+    label: "PRIVATE",
+    bucket: privateBucket,
+    listedKeys: privateListed,
+    inUseKeys: privateKeys,
+    doDelete,
+    deleteFn: (key) => supabase.deletePrivateObject(key),
+  });
 
-  if (orphaned.length === 0) {
-    console.log("No orphaned files found. Storage is already clean.");
-    process.exit(0);
+  if (doDelete) {
+    console.log(`\nDone — removed ${totalDeleted} orphaned file(s) across both buckets.`);
+  } else {
+    console.log(`\nDry run complete. Re-run with --delete to actually remove the files listed above.`);
   }
-
-  console.log(`\n${orphaned.length} orphaned file(s):`);
-  orphaned.forEach((key) => console.log(`  - ${key}`));
-
-  if (!doDelete) {
-    console.log("\nThis was a dry run — nothing was deleted. Re-run with --delete to remove these files.");
-    process.exit(0);
-  }
-
-  console.log("\nDeleting...");
-  for (const key of orphaned) {
-    await supabase.deleteObject(key);
-    console.log(`  deleted: ${key}`);
-  }
-  console.log(`\nDone — removed ${orphaned.length} orphaned file(s).`);
   process.exit(0);
 }
 

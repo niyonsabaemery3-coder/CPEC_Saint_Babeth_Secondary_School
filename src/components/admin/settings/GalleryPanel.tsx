@@ -186,7 +186,7 @@ export default function GalleryPanel() {
           <div className="gallery-admin-thumbnails" aria-label={`${selectedCategory} photos`}>
             {activePhotos.map((photo, index) => (
               <button type="button" key={photo.id ?? `new-${index}`} className={index === photoIndex ? "active" : ""} onClick={() => setPhotoIndex(index)}>
-                <img src={photo.img} alt={photo.cap || `Photo ${index + 1}`} />
+                <img src={photo.img} alt={photo.cap || `Photo ${index + 1}`} loading="lazy" decoding="async" />
                 <span>{index + 1}</span>
               </button>
             ))}

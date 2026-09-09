@@ -47,9 +47,11 @@ export interface Faq {
 }
 
 export interface ProgramCard {
+  id?: number;
   section: string;
   title: string;
   desc: string;
+  img?: string;
 }
 
 export interface GalleryItem {
@@ -82,7 +84,7 @@ export interface SiteContent {
   coreValues: string[];
   aboutLi: string[];
 
-  programs: [ProgramCard, ProgramCard, ProgramCard];
+  programs: ProgramCard[];
   stripTitle: string;
   stripDesc: string;
 

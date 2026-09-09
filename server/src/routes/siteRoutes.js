@@ -1,10 +1,15 @@
-const express = require("express");
+﻿const express = require("express");
 const pool = require("../db");
 const { requireAdmin } = require("../middleware/auth");
-const { saveBase64File, deleteUploadedFile } = require("../utils/uploads");
+const { saveBase64File, deleteUploadedFile, MAX_FILE_BYTES } = require("../utils/uploads");
 const { toAbsoluteUploadUrl, toRelativeUploadPath } = require("../utils/publicUrl");
+const { logAction } = require("../utils/audit");
 
 const router = express.Router();
+
+function actorName(auth) {
+  return auth.username || auth.email || null;
+}
 
 /* =========================================================================
    TRUE PER-SECTION ISOLATION
@@ -32,7 +37,7 @@ async function assembleSiteContent(req) {
   const [[site]] = await pool.query("SELECT * FROM site_content WHERE id = 1");
   if (!site) return null;
   const [aboutPoints] = await pool.query("SELECT text FROM about_points WHERE site_content_id = 1 ORDER BY sort_order ASC");
-  const [programs] = await pool.query("SELECT title, description, section FROM programs WHERE site_content_id = 1 ORDER BY sort_order ASC");
+  const [programs] = await pool.query("SELECT id, title, description, section, image_url FROM programs WHERE site_content_id = 1 ORDER BY sort_order ASC");
   const [gallery] = await pool.query("SELECT id, image_url, caption, category FROM gallery_items WHERE site_content_id = 1 ORDER BY sort_order ASC");
 
   let heroImages = [];
@@ -74,9 +79,11 @@ async function assembleSiteContent(req) {
     coreValues,
     aboutLi: aboutPoints.map((p) => p.text),
     programs: programs.map((p) => ({
+      id: p.id,
       section: p.section?.trim() || "Ordinary Level",
       title: p.title,
       desc: p.description,
+      img: toAbsoluteUploadUrl(req, p.image_url) || "",
     })),
     stripTitle: site.strip_title,
     stripDesc: site.strip_desc,
@@ -107,6 +114,119 @@ async function ensureSiteRow() {
   if (!row) throw Object.assign(new Error("Site content not seeded yet -- run `npm run db:seed`."), { status: 404 });
 }
 
+// ----------------------------------------------------------- DB STATS --
+// Returns real-time database and storage statistics for the admin panel.
+router.get("/stats", requireAdmin, async (req, res, next) => {
+  try {
+    // Row counts per table
+    const tables = [
+      "admins", "teacher_accounts", "student_accounts", "teachers",
+      "resources", "applications", "faqs", "site_content",
+      "gallery_items", "programs", "news_items", "upcoming_events",
+      "student_reports", "audit_logs",
+    ];
+    const counts = {};
+    for (const t of tables) {
+      try {
+        const [[row]] = await pool.query(`SELECT COUNT(*) AS cnt FROM \`${t}\``);
+        counts[t] = Number(row?.cnt ?? 0);
+      } catch { counts[t] = 0; }
+    }
+
+    // Database size in MB (information_schema)
+    const [[sizeRow]] = await pool.query(
+      `SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS size_mb
+       FROM information_schema.TABLES
+       WHERE table_schema = DATABASE()`
+    );
+    const dbSizeMb = Number(sizeRow?.size_mb ?? 0);
+
+    // Table count
+    const [[tableCountRow]] = await pool.query(
+      `SELECT COUNT(*) AS cnt FROM information_schema.TABLES WHERE table_schema = DATABASE()`
+    );
+    const tableCount = Number(tableCountRow?.cnt ?? 0);
+
+    // Storage: count all non-empty file references tracked in the database.
+    // This is the real number of managed files the system knows about.
+    const fileCols = [
+      { table: "resources",       col: "file_url" },
+      { table: "applications",    col: "report_file_url" },
+      { table: "applications",    col: "feedback_file_url" },
+      { table: "gallery_items",   col: "image_url" },
+      { table: "programs",        col: "image_url" },
+      { table: "teachers",        col: "photo_url" },
+      { table: "student_reports", col: "file_url" },
+      { table: "news_items",      col: "image_url" },
+      { table: "upcoming_events", col: "image_url" },
+    ];
+    let totalFiles = 0;
+    for (const { table, col } of fileCols) {
+      try {
+        const [[row]] = await pool.query(
+          `SELECT COUNT(*) AS cnt FROM \`${table}\` WHERE \`${col}\` IS NOT NULL AND \`${col}\` != ''`
+        );
+        totalFiles += Number(row?.cnt ?? 0);
+      } catch { /* column may not exist yet on older DBs — skip */ }
+    }
+
+    // Supabase Storage is the only active runtime storage provider (see
+    // utils/uploads.js). Local disk is a development-only fallback when
+    // Supabase isn't configured; Cloudflare R2 is kept in the codebase only
+    // to clean up (delete) objects created under an older setup — new
+    // uploads never write to it, so it is never reported as "active".
+    const supabaseConfigured = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY);
+    const storageProvider = supabaseConfigured ? "Supabase Storage" : "Local Server Storage (development)";
+
+    res.json({
+      counts,
+      dbSizeMb,
+      tableCount,
+      storage: {
+        provider: storageProvider,
+        totalFiles,
+        maxFileSizeMb: MAX_FILE_BYTES / (1024 * 1024),
+        allowedImages: ["JPG", "PNG", "WebP", "GIF"],
+        allowedDocs: ["PDF", "DOC", "DOCX", "PPT", "PPTX"],
+      },
+      recordedAt: new Date().toISOString(),
+    });
+  } catch (err) { next(err); }
+});
+
+// -------------------------------------------------------- DATA EXPORT --
+// Exports school data as a JSON download. ?type= filters to a single dataset.
+// Supported types: applications | students | teachers | resources | (omit = all)
+router.get("/export", requireAdmin, async (req, res, next) => {
+  try {
+    const type = req.query.type || "all";
+    const exportedAt = new Date().toISOString();
+    let payload = { exportedAt };
+
+    if (type === "applications" || type === "all") {
+      const [rows] = await pool.query("SELECT id, student_name, dob, gender, track_year, admission_type, prev_school, district, sector, parent_name, parent_email, phone1, status, created_at FROM applications ORDER BY created_at DESC");
+      payload.applications = rows;
+    }
+    if (type === "teachers" || type === "all") {
+      const [rows] = await pool.query("SELECT id, full_name, email, subject, status, created_at FROM teacher_accounts ORDER BY created_at DESC");
+      payload.teacherAccounts = rows;
+    }
+    if (type === "students" || type === "all") {
+      const [rows] = await pool.query("SELECT id, full_name, email, school_class, status, created_at FROM student_accounts ORDER BY created_at DESC");
+      payload.studentAccounts = rows;
+    }
+    if (type === "resources" || type === "all") {
+      const [rows] = await pool.query("SELECT id, title, subject, school_class, type, created_at FROM resources ORDER BY created_at DESC");
+      payload.resources = rows;
+    }
+
+    const filename = `cpec-${type}-${new Date().toISOString().slice(0, 10)}.json`;
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.json(payload);
+  } catch (err) { next(err); }
+});
+
 // ---------------------------------------------------------------- HOME --
 // Owns ONLY: hero_img, hero_main, hero_accent, hero_sub, feat1/2/3 title+desc.
 // This statement cannot reference about_*, strip_*, contact_*, or any child
@@ -136,7 +256,18 @@ router.put("/home", requireAdmin, async (req, res, next) => {
       [heroImg, JSON.stringify(savedHeroImages), b.heroMain, b.heroAccent, b.heroSub, b.feat1Title, b.feat1Desc, b.feat2Title, b.feat2Desc, b.feat3Title, b.feat3Desc]
     );
 
-    if (heroImg !== oldHeroImg && oldHeroImg) await deleteUploadedFile(oldHeroImg).catch(() => {});
+    const heroImgReplaced = heroImg !== oldHeroImg && oldHeroImg;
+    if (heroImgReplaced) await deleteUploadedFile(oldHeroImg).catch(() => {});
+
+    await logAction({
+      actorRole: "admin",
+      actorId: req.auth.id,
+      actorName: actorName(req.auth),
+      action: "update",
+      entityType: "site_content_home",
+      entityId: 1,
+      details: { heroImageReplaced: !!heroImgReplaced, heroImageCount: savedHeroImages.length },
+    });
 
     res.json(await assembleSiteContent(req));
   } catch (err) {
@@ -182,6 +313,22 @@ router.put("/home/hero-images", requireAdmin, async (req, res, next) => {
       [heroImg, JSON.stringify(savedImages)]
     );
 
+    // Clean up any previously-saved images that are no longer in the set
+    // (removed by the admin, or replaced by a re-upload of the same slot),
+    // so a save here never leaves an orphaned file behind.
+    const removed = serverImages.filter((old) => old && !savedImages.includes(old));
+    await Promise.all(removed.map((url) => deleteUploadedFile(url).catch(() => {})));
+
+    await logAction({
+      actorRole: "admin",
+      actorId: req.auth.id,
+      actorName: actorName(req.auth),
+      action: "update",
+      entityType: "site_content_home_hero_images",
+      entityId: 1,
+      details: { imageCount: savedImages.length, imagesRemoved: removed.length },
+    });
+
     res.json(await assembleSiteContent(req));
   } catch (err) {
     next(err);
@@ -223,7 +370,19 @@ router.put("/about", requireAdmin, async (req, res, next) => {
     }
 
     await conn.commit();
-    if (aboutImg !== oldAboutImg && oldAboutImg) await deleteUploadedFile(oldAboutImg).catch(() => {});
+    const aboutImgReplaced = aboutImg !== oldAboutImg && oldAboutImg;
+    if (aboutImgReplaced) await deleteUploadedFile(oldAboutImg).catch(() => {});
+
+    await logAction({
+      actorRole: "admin",
+      actorId: req.auth.id,
+      actorName: actorName(req.auth),
+      action: "update",
+      entityType: "site_content_about",
+      entityId: 1,
+      details: { aboutImageReplaced: !!aboutImgReplaced },
+    });
+
     res.json(await assembleSiteContent(req));
   } catch (err) {
     await conn.rollback();
@@ -244,16 +403,38 @@ router.put("/academics", requireAdmin, async (req, res, next) => {
 
     await conn.query(`UPDATE site_content SET strip_title = ?, strip_desc = ? WHERE id = 1`, [b.stripTitle, b.stripDesc]);
 
+    const [oldPrograms] = await conn.query("SELECT image_url FROM programs WHERE site_content_id = 1");
+    const oldProgramImages = oldPrograms.map((p) => p.image_url).filter(Boolean);
+
     await conn.query("DELETE FROM programs WHERE site_content_id = 1");
+    const newProgramImages = [];
     for (const [i, p] of (b.programs || []).entries()) {
       const section = typeof p.section === "string" && p.section.trim() ? p.section.trim() : "Ordinary Level";
+      const imgUrl = p.img?.startsWith("data:") ? await saveBase64File(p.img, "images") : toRelativeUploadPath(p.img || "");
+      if (imgUrl) newProgramImages.push(imgUrl);
       await conn.query(
-        "INSERT INTO programs (site_content_id, title, description, section, sort_order) VALUES (1, ?, ?, ?, ?)",
-        [p.title, p.desc, section, i]
+        "INSERT INTO programs (site_content_id, title, description, section, image_url, sort_order) VALUES (1, ?, ?, ?, ?, ?)",
+        [p.title, p.desc, section, imgUrl || null, i]
       );
     }
 
     await conn.commit();
+
+    // Clean up program images that were saved before but aren't referenced
+    // by the new program list, so a save here never leaves an orphaned file.
+    const removedProgramImages = oldProgramImages.filter((url) => !newProgramImages.includes(url));
+    await Promise.all(removedProgramImages.map((url) => deleteUploadedFile(url).catch(() => {})));
+
+    await logAction({
+      actorRole: "admin",
+      actorId: req.auth.id,
+      actorName: actorName(req.auth),
+      action: "update",
+      entityType: "site_content_academics",
+      entityId: 1,
+      details: { programCount: (b.programs || []).length, imagesRemoved: removedProgramImages.length },
+    });
+
     res.json(await assembleSiteContent(req));
   } catch (err) {
     await conn.rollback();
@@ -261,6 +442,88 @@ router.put("/academics", requireAdmin, async (req, res, next) => {
   } finally {
     conn.release();
   }
+});
+
+// ------------------------------------------------ PROGRAMS (per-card) --
+// Add a new program card.
+router.post("/programs", requireAdmin, async (req, res, next) => {
+  try {
+    await ensureSiteRow();
+    const b = req.body || {};
+    const section = typeof b.section === "string" && b.section.trim() ? b.section.trim() : "Ordinary Level";
+    const imgUrl = b.img?.startsWith("data:") ? await saveBase64File(b.img, "images") : toRelativeUploadPath(b.img || "");
+    const [[{ maxOrder }]] = await pool.query(
+      "SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM programs WHERE site_content_id = 1"
+    );
+    const [result] = await pool.query(
+      "INSERT INTO programs (site_content_id, title, description, section, image_url, sort_order) VALUES (1, ?, ?, ?, ?, ?)",
+      [b.title || "New Program", b.desc || "", section, imgUrl || null, maxOrder + 1]
+    );
+
+    await logAction({
+      actorRole: "admin",
+      actorId: req.auth.id,
+      actorName: actorName(req.auth),
+      action: "create",
+      entityType: "program",
+      entityId: result.insertId,
+      details: { title: b.title || "New Program", hasImage: !!imgUrl },
+    });
+
+    res.json({ id: result.insertId, section, title: b.title || "New Program", desc: b.desc || "", img: toAbsoluteUploadUrl(req, imgUrl) || "" });
+  } catch (err) { next(err); }
+});
+
+// Update ONE program card by id.
+router.put("/programs/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const [[existing]] = await pool.query("SELECT * FROM programs WHERE id = ? AND site_content_id = 1", [id]);
+    if (!existing) return res.status(404).json({ error: "Program not found." });
+    const b = req.body || {};
+    const section = typeof b.section === "string" && b.section.trim() ? b.section.trim() : "Ordinary Level";
+    const imgUrl = b.img?.startsWith("data:") ? await saveBase64File(b.img, "images") : toRelativeUploadPath(b.img || "");
+    await pool.query(
+      "UPDATE programs SET title = ?, description = ?, section = ?, image_url = ? WHERE id = ?",
+      [b.title || existing.title, b.desc || existing.description, section, imgUrl || existing.image_url, id]
+    );
+    if (imgUrl && imgUrl !== existing.image_url && existing.image_url) await deleteUploadedFile(existing.image_url).catch(() => {});
+
+    await logAction({
+      actorRole: "admin",
+      actorId: req.auth.id,
+      actorName: actorName(req.auth),
+      action: "update",
+      entityType: "program",
+      entityId: id,
+      details: { title: b.title || existing.title, imageReplaced: !!(imgUrl && imgUrl !== existing.image_url) },
+    });
+
+    res.json({ id, section, title: b.title || existing.title, desc: b.desc || existing.description, img: toAbsoluteUploadUrl(req, imgUrl || existing.image_url) || "" });
+  } catch (err) { next(err); }
+});
+
+// Delete ONE program card by id.
+router.delete("/programs/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const [[existing]] = await pool.query("SELECT * FROM programs WHERE id = ? AND site_content_id = 1", [id]);
+    if (!existing) return res.status(404).json({ error: "Program not found." });
+    await pool.query("DELETE FROM programs WHERE id = ?", [id]);
+    if (existing.image_url) await deleteUploadedFile(existing.image_url).catch(() => {});
+
+    await logAction({
+      actorRole: "admin",
+      actorId: req.auth.id,
+      actorName: actorName(req.auth),
+      action: "delete",
+      entityType: "program",
+      entityId: id,
+      details: { title: existing.title },
+    });
+
+    res.json({ id, deleted: true });
+  } catch (err) { next(err); }
 });
 
 // -------------------------------------------------------------- GALLERY --
@@ -285,6 +548,16 @@ router.post("/gallery", requireAdmin, async (req, res, next) => {
       [imageUrl, b.cap || "", category, maxOrder + 1]
     );
 
+    await logAction({
+      actorRole: "admin",
+      actorId: req.auth.id,
+      actorName: actorName(req.auth),
+      action: "create",
+      entityType: "gallery_item",
+      entityId: result.insertId,
+      details: { caption: b.cap || "", category },
+    });
+
     res.json({ id: result.insertId, img: toAbsoluteUploadUrl(req, imageUrl), cap: b.cap || "", category });
   } catch (err) {
     next(err);
@@ -305,7 +578,18 @@ router.put("/gallery/:id", requireAdmin, async (req, res, next) => {
 
     await pool.query("UPDATE gallery_items SET image_url = ?, caption = ?, category = ? WHERE id = ?", [imageUrl, b.cap || "", category, id]);
 
-    if (imageUrl !== existing.image_url && existing.image_url) await deleteUploadedFile(existing.image_url).catch(() => {});
+    const imageReplaced = imageUrl !== existing.image_url && existing.image_url;
+    if (imageReplaced) await deleteUploadedFile(existing.image_url).catch(() => {});
+
+    await logAction({
+      actorRole: "admin",
+      actorId: req.auth.id,
+      actorName: actorName(req.auth),
+      action: "update",
+      entityType: "gallery_item",
+      entityId: id,
+      details: { caption: b.cap || "", category, imageReplaced: !!imageReplaced },
+    });
 
     res.json({ id, img: toAbsoluteUploadUrl(req, imageUrl), cap: b.cap || "", category });
   } catch (err) {
@@ -322,6 +606,15 @@ router.delete("/gallery/:id", requireAdmin, async (req, res, next) => {
 
     await pool.query("DELETE FROM gallery_items WHERE id = ?", [id]);
     if (existing.image_url) await deleteUploadedFile(existing.image_url).catch(() => {});
+
+    await logAction({
+      actorRole: "admin",
+      actorId: req.auth.id,
+      actorName: actorName(req.auth),
+      action: "delete",
+      entityType: "gallery_item",
+      entityId: id,
+    });
 
     res.json({ id, deleted: true });
   } catch (err) {
