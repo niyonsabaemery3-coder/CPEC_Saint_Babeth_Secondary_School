@@ -4,6 +4,7 @@ import { useApp } from "../../context/AppContext";
 import type { AdminView } from "../../types";
 import DashboardView from "./views/DashboardView";
 import ApplicationsView from "./views/ApplicationsView";
+import MessagesView from "./views/MessagesView";
 import TeachersView from "./views/TeachersView";
 import StudentsView from "./views/StudentsView";
 import NewsEventsView from "./views/NewsEventsView";
@@ -14,6 +15,7 @@ import ProfileDropdown from "../shared/ProfileDropdown";
 const NAV: { key: AdminView; icon: string; label: string }[] = [
   { key: "dash",       icon: "fa-gauge-high",      label: "Dashboard"     },
   { key: "apps",       icon: "fa-file-lines",       label: "Applications"  },
+  { key: "messages",   icon: "fa-envelope",         label: "Messages"      },
   { key: "teach",      icon: "fa-chalkboard-user",  label: "Team"          },
   { key: "students",   icon: "fa-user-graduate",    label: "Students"      },
   { key: "newsEvents", icon: "fa-calendar-days",    label: "News & Events" },
@@ -23,6 +25,7 @@ const NAV: { key: AdminView; icon: string; label: string }[] = [
 const TITLES: Record<AdminView, string> = {
   dash:       "Dashboard",
   apps:       "Applications",
+  messages:   "Messages",
   teach:      "Team",
   students:   "Students",
   newsEvents: "News & Events",
@@ -36,7 +39,7 @@ interface AdminShellProps {
 }
 
 export default function AdminShell({ open, onExit }: AdminShellProps) {
-  const { adminView, setAdminView, adminUser, logout } = useApp();
+  const { adminView, setAdminView, adminUser, logout, unreadMessageCount } = useApp();
 
   // Remember which view was active before opening Profile so we can go back
   const prevView = useRef<AdminView>("dash");
@@ -69,7 +72,12 @@ export default function AdminShell({ open, onExit }: AdminShellProps) {
             className={`a-nav-item ${adminView === n.key ? "active" : ""}`}
             onClick={() => setAdminView(n.key)}
           >
-            <span><i className={`fa-solid ${n.icon}`} /></span>{" "}
+            <span style={{ position: "relative" }}>
+              <i className={`fa-solid ${n.icon}`} />
+              {n.key === "messages" && unreadMessageCount > 0 && (
+                <span className="msg-nav-badge">{unreadMessageCount > 99 ? "99+" : unreadMessageCount}</span>
+              )}
+            </span>{" "}
             {n.label}
           </button>
         ))}
@@ -110,6 +118,7 @@ export default function AdminShell({ open, onExit }: AdminShellProps) {
 
         {adminView === "dash"       && <DashboardView />}
         {adminView === "apps"       && <ApplicationsView />}
+        {adminView === "messages"   && <MessagesView />}
         {adminView === "teach"      && <TeachersView />}
         {adminView === "students"   && <StudentsView />}
         {adminView === "newsEvents" && <NewsEventsView />}
@@ -120,7 +129,12 @@ export default function AdminShell({ open, onExit }: AdminShellProps) {
       <div className="a-bottom-tabs">
         {NAV.map((n) => (
           <button key={n.key} className={adminView === n.key ? "active" : ""} onClick={() => setAdminView(n.key)}>
-            <span className="ti"><i className={`fa-solid ${n.icon}`} /></span>
+            <span className="ti" style={{ position: "relative" }}>
+              <i className={`fa-solid ${n.icon}`} />
+              {n.key === "messages" && unreadMessageCount > 0 && (
+                <span className="msg-nav-badge">{unreadMessageCount > 99 ? "99+" : unreadMessageCount}</span>
+              )}
+            </span>
             {n.label}
           </button>
         ))}

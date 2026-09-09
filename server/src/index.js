@@ -47,6 +47,7 @@ const termRoutes = require("./routes/termRoutes");
 const markRoutes = require("./routes/markRoutes");
 
 const auditRoutes = require("./routes/auditRoutes");
+const contactRoutes = require("./routes/contactRoutes");
 
 const app = express();
 
@@ -184,6 +185,7 @@ app.use("/api/terms", termRoutes);
 app.use("/api/marks", markRoutes);
 
 app.use("/api/audit-logs", auditRoutes);
+app.use("/api/contact", contactRoutes);
 
 // Client-side routes the SPA actually handles (kept in sync with src/App.tsx).
 // A request for anything else is a genuine 404 — even though we still need
@@ -596,7 +598,25 @@ async function runAdmissionTypeMigration() {
   }
 }
 
+async function runContactMessagesMigration() {
+  // Idempotent — safe on every startup. Creates the contact_messages table
+  // for databases set up before the contact form persistence feature was added.
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS contact_messages (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      name       VARCHAR(150) NOT NULL,
+      contact    VARCHAR(200) NOT NULL,
+      message    TEXT NOT NULL,
+      is_read    TINYINT(1) NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_contact_messages_read (is_read),
+      INDEX idx_contact_messages_created (created_at)
+    ) ENGINE=InnoDB
+  `);
+}
+
 async function runMigrations() {
+  await runContactMessagesMigration();
   await runApplicationsTableEnsureColumns();
   await runAboutHistoryMigration();
   await runGalleryMigration();

@@ -17,6 +17,7 @@ import type {
   RegistrationSettings,
   NewsItem,
   EventItem,
+  ContactMessage,
 } from "../types";
 import {
   api,
@@ -247,6 +248,16 @@ interface AppContextValue {
   updateEventItem: (id: number, e: Omit<EventItem, "id">) => Promise<void>;
   deleteEventItem: (id: number) => Promise<void>;
 
+  // contact messages
+  contactMessages: ContactMessage[];
+  unreadMessageCount: number;
+  fetchContactMessages: (unreadOnly?: boolean) => Promise<void>;
+  sendContactMessage: (data: { name: string; contact: string; message: string }) => Promise<void>;
+  markMessageRead: (id: number) => Promise<void>;
+  markAllMessagesRead: () => Promise<void>;
+  deleteMessage: (id: number) => Promise<void>;
+  deleteAllMessages: () => Promise<void>;
+
   // unified login — auto-detects role from backend response
   unifiedLogin: (identifier: string, password: string) => Promise<{ ok: boolean; message: string }>;
 
@@ -288,6 +299,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [pageBanners, setPageBanners] = useState<PageBanners>(DEFAULT_PAGE_BANNERS);
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [eventItems, setEventItems] = useState<EventItem[]>([]);
+  const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   const [teacherAccounts, setTeacherAccounts] = useState<TeacherAccount[]>([]);
   const [studentAccounts, setStudentAccounts] = useState<StudentAccount[]>([]);
@@ -434,6 +447,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (e instanceof ApiError && e.status === 401) logout();
         else console.error("Failed to load student reports:", e);
       });
+    api
+      .get<{ count: number }>("/api/contact/unread-count", "admin")
+      .then((data) => setUnreadMessageCount(data.count))
+      .catch((e) => console.error("Failed to load unread count:", e));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminLoggedIn]);
 
@@ -888,6 +905,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // --------------------------------------------------------- CONTACT MESSAGES --
+  const sendContactMessage = async (data: { name: string; contact: string; message: string }) => {
+    await api.post<ContactMessage>("/api/contact", data);
+  };
+
+  const fetchContactMessages = async (unreadOnly = false) => {
+    const url = unreadOnly ? "/api/contact?unread=1" : "/api/contact";
+    const data = await api.get<ContactMessage[]>(url, "admin");
+    setContactMessages(data);
+    setUnreadMessageCount(data.filter((m) => !m.isRead).length);
+  };
+
+  const markMessageRead = async (id: number) => {
+    const updated = await api.patch<ContactMessage>(`/api/contact/${id}/read`, undefined, "admin");
+    setContactMessages((prev) => prev.map((m) => (m.id === id ? updated : m)));
+    setUnreadMessageCount((prev) => Math.max(0, prev - 1));
+  };
+
+  const markAllMessagesRead = async () => {
+    await api.patch<{ ok: boolean }>("/api/contact/read-all", undefined, "admin");
+    setContactMessages((prev) => prev.map((m) => ({ ...m, isRead: true })));
+    setUnreadMessageCount(0);
+  };
+
+  const deleteMessage = async (id: number) => {
+    const msg = contactMessages.find((m) => m.id === id);
+    await api.delete(`/api/contact/${id}`, "admin");
+    setContactMessages((prev) => prev.filter((m) => m.id !== id));
+    if (msg && !msg.isRead) setUnreadMessageCount((prev) => Math.max(0, prev - 1));
+  };
+
+  const deleteAllMessages = async () => {
+    await api.delete("/api/contact", "admin");
+    setContactMessages([]);
+    setUnreadMessageCount(0);
+  };
+
   // ------------------------------------------------------------------ ADMIN AUTH --
   const login = async (user: string, pass: string) => {
     try {
@@ -1003,6 +1057,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     unifiedLogin,
     adminView,
     setAdminView,
+    contactMessages,
+    unreadMessageCount,
+    fetchContactMessages,
+    sendContactMessage,
+    markMessageRead,
+    markAllMessagesRead,
+    deleteMessage,
+    deleteAllMessages,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

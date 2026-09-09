@@ -6,16 +6,17 @@ import { validateMinLength, validateEmail, validateRwandaPhone, isValid } from "
 import { useFadeUp } from "../../hooks/useScrollAnimations";
 
 export default function Contact() {
-  const { site } = useApp();
+  const { site, sendContactMessage } = useApp();
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
   const [message, setMessage] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [serverError, setServerError] = useState("");
   const ref = useRef<HTMLElement>(null);
   useFadeUp(ref);
 
-  // "Email or phone" — accept either a valid email or a valid Rwandan phone number.
   const validateContactField = (value: string): string => {
     if (!value.trim()) return "Enter an email or phone number.";
     const looksLikeEmail = value.includes("@");
@@ -23,7 +24,7 @@ export default function Contact() {
     return validateRwandaPhone(value, "Phone number");
   };
 
-  const send = () => {
+  const send = async () => {
     const nextErrors = {
       name: validateMinLength(name, 3, "Full name"),
       contact: validateContactField(contact),
@@ -32,12 +33,21 @@ export default function Contact() {
     setErrors(nextErrors);
     if (!isValid(nextErrors)) return;
 
-    setSent(true);
-    setTimeout(() => setSent(false), 6000);
-    setName("");
-    setContact("");
-    setMessage("");
-    setErrors({});
+    setSending(true);
+    setServerError("");
+    try {
+      await sendContactMessage({ name: name.trim(), contact: contact.trim(), message: message.trim() });
+      setSent(true);
+      setName("");
+      setContact("");
+      setMessage("");
+      setErrors({});
+      setTimeout(() => setSent(false), 6000);
+    } catch {
+      setServerError("Failed to send your message. Please try again or call us directly.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -91,7 +101,12 @@ export default function Contact() {
           <p>We'll get back to you as soon as possible.</p>
           {sent && (
             <div className="ta-notice info">
-              <i className="fa-solid fa-circle-check" /> Thank you! Your message has been noted.
+              <i className="fa-solid fa-circle-check" /> Thank you! Your message has been received. We'll get back to you soon.
+            </div>
+          )}
+          {serverError && (
+            <div className="ta-notice error">
+              <i className="fa-solid fa-circle-exclamation" /> {serverError}
             </div>
           )}
           <div className="ffield">
@@ -127,8 +142,8 @@ export default function Contact() {
             <label>Message</label>
           </div>
           <FieldError message={errors.message} />
-          <button type="button" onClick={send}>
-            Send Message
+          <button type="button" onClick={send} disabled={sending}>
+            {sending ? <><i className="fa-solid fa-spinner fa-spin" /> Sending...</> : "Send Message"}
           </button>
         </div>
       </div>

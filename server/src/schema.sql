@@ -138,6 +138,20 @@ CREATE TABLE IF NOT EXISTS application_feedback_templates (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------------
+-- Contact messages — submitted from the public Contact form.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS contact_messages (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  name       VARCHAR(150) NOT NULL,
+  contact    VARCHAR(200) NOT NULL,
+  message    TEXT NOT NULL,
+  is_read    TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_contact_messages_read (is_read),
+  INDEX idx_contact_messages_created (created_at)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------------
 -- FAQs — powers the floating chat widget.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS faqs (

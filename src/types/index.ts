@@ -215,7 +215,16 @@ export interface StudentReport {
 
 export type Theme = "light" | "dark";
 
-export type AdminView = "dash" | "apps" | "teach" | "students" | "newsEvents" | "settings" | "profile";
+export type AdminView = "dash" | "apps" | "messages" | "teach" | "students" | "newsEvents" | "settings" | "profile";
+
+export interface ContactMessage {
+  id: number;
+  name: string;
+  contact: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+}
 export type TeachAdminTab = "accounts" | "resources";
 export type StudentsAdminTab = "accounts" | "reports";
 export type NewsEventsAdminTab = "news" | "events";
