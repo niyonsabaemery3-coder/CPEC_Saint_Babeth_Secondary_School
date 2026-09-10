@@ -23,6 +23,19 @@ function toPublic(row) {
   };
 }
 
+// Public: total count of active student accounts — used by the homepage
+// stat card so visitors see the real student count without needing to log in.
+router.get("/count", async (_req, res) => {
+  try {
+    const [[row]] = await pool.query(
+      "SELECT COUNT(*) AS cnt FROM student_accounts WHERE status = 'active'"
+    );
+    res.json({ count: Number(row?.cnt ?? 0) });
+  } catch {
+    res.json({ count: 0 });
+  }
+});
+
 // Admin: list student accounts — powers the Students report screen.
 // Supports optional filtering/sorting so the report can be generated exactly
 // the way the admin picked it: by class, and always ordered by name unless

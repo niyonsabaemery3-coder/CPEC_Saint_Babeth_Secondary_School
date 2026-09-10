@@ -162,6 +162,8 @@ interface AppContextValue {
   updateTeacherPassword: (currentPassword: string, newPassword: string) => Promise<{ ok: boolean; message: string }>;
   updateTeacherProfile: (data: { fullName?: string; email?: string; subject?: string }) => Promise<{ ok: boolean; message: string }>;
 
+  // public student count — available to all visitors without login
+  publicStudentCount: number;
   // student accounts (admin-managed, plus optional self-registration — see registrationSettings)
   studentAccounts: StudentAccount[];
   fetchStudentAccounts: (params?: { schoolClass?: string; sort?: string; order?: string; search?: string }) => Promise<void>;
@@ -307,6 +309,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   const [teacherAccounts, setTeacherAccounts] = useState<TeacherAccount[]>([]);
+  const [publicStudentCount, setPublicStudentCount] = useState(0);
   const [studentAccounts, setStudentAccounts] = useState<StudentAccount[]>([]);
   const [currentTeacher, setCurrentTeacher] = useState<TeacherAccount | null>(null);
   const [teacherLoggedIn, setTeacherLoggedIn] = useState(false);
@@ -370,6 +373,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .get<EventItem[]>("/api/events")
       .then((data) => Array.isArray(data) && setEventItems(data))
       .catch((e) => console.error("Failed to load events:", e));
+
+    api
+      .get<{ count: number }>("/api/student-accounts/count")
+      .then((data) => setPublicStudentCount(data.count))
+      .catch(() => setPublicStudentCount(0));
   }, []);
   // ---- restore admin session from a saved token --------------------------------
   useEffect(() => {
@@ -1014,6 +1022,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     teacherLogout,
     updateTeacherPassword,
     updateTeacherProfile,
+    publicStudentCount,
     studentAccounts,
     fetchStudentAccounts,
     createStudentAccount,
