@@ -1819,7 +1819,7 @@
     transition:.25s var(--ease); white-space:nowrap;
   }
   .en-tab:hover{background:rgba(24,26,31,.05); color:var(--ink);}
-  .en-tab.active{background:var(--navy); color:#fff; box-shadow:0 4px 14px -4px rgba(30,40,80,.25);}
+  .en-tab.active{background:#cb7b00; color:#fff; box-shadow:0 4px 14px -4px rgba(30,40,80,.25);}
   .en-count{
     display:inline-flex; align-items:center; justify-content:center;
     min-width:20px; height:20px; padding:0 6px;
