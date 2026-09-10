@@ -3,10 +3,9 @@ const pool = require("../db");
 const { hashPassword, verifyPassword } = require("../utils/password");
 const { signToken, requireAdmin, requireTeacher, requireStudent } = require("../middleware/auth");
 const { SCHOOL_CLASS_VALUES } = require("../constants/academics");
+const { validate, isEmail } = require("../utils/validate");
 
 const router = express.Router();
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function teacherAccountPublic(row) {
   return {
@@ -168,8 +167,6 @@ router.post("/teacher/login", async (req, res) => {
 // admin has enabled auto-activation for teachers (auto_activate_teacher_register),
 // in which case it starts 'active' and can log in immediately.
 router.post("/teacher/register", async (req, res) => {
-  const { fullName, email, password, subject } = req.body || {};
-
   const [[site]] = await pool.query(
     "SELECT allow_teacher_register, auto_activate_teacher_register FROM site_content WHERE id = 1"
   );
@@ -177,16 +174,14 @@ router.post("/teacher/register", async (req, res) => {
     return res.status(403).json({ error: "Self-registration is currently disabled. Contact the admin." });
   }
 
-  if (!fullName?.trim() || !email?.trim() || !password || !subject?.trim()) {
-    return res.status(400).json({ error: "Please fill in all fields." });
-  }
-  if (!EMAIL_RE.test(email.trim())) {
-    return res.status(400).json({ error: "Enter a valid email address." });
-  }
-  if (password.length < 6) {
-    return res.status(400).json({ error: "Password must be at least 6 characters." });
-  }
-  const normalizedEmail = email.trim().toLowerCase();
+  const { errors, data } = validate(req.body, {
+    fullName: { type: "string", required: true, min: 2, max: 150, label: "Full name" },
+    email:    { type: "email", required: true, max: 150, label: "Email" },
+    password: { type: "string", required: true, min: 6, max: 128, label: "Password" },
+    subject:  { type: "string", required: true, max: 120, label: "Subject" },
+  });
+  if (errors.length) return res.status(400).json({ error: errors[0], errors });
+  const { fullName, email: normalizedEmail, password, subject } = data;
 
   const [existing] = await pool.query("SELECT id FROM teacher_accounts WHERE email = ?", [normalizedEmail]);
   if (existing.length > 0) {
@@ -197,7 +192,7 @@ router.post("/teacher/register", async (req, res) => {
   const hash = await hashPassword(password);
   await pool.query(
     "INSERT INTO teacher_accounts (full_name, email, password_hash, subject, status) VALUES (?, ?, ?, ?, ?)",
-    [fullName.trim(), normalizedEmail, hash, subject.trim(), autoActivate ? "active" : "deactivated"]
+    [fullName, normalizedEmail, hash, subject, autoActivate ? "active" : "deactivated"]
   );
 
   res.status(201).json({
@@ -261,8 +256,6 @@ router.post("/student/login", async (req, res) => {
 // admin has enabled auto-activation for students (auto_activate_student_register),
 // in which case it starts 'active' and can log in immediately.
 router.post("/student/register", async (req, res) => {
-  const { fullName, email, password, schoolClass } = req.body || {};
-
   const [[site]] = await pool.query(
     "SELECT allow_student_register, auto_activate_student_register FROM site_content WHERE id = 1"
   );
@@ -270,19 +263,14 @@ router.post("/student/register", async (req, res) => {
     return res.status(403).json({ error: "Self-registration is currently disabled. Contact the admin." });
   }
 
-  if (!fullName?.trim() || !email?.trim() || !password || !schoolClass) {
-    return res.status(400).json({ error: "Please fill in all fields." });
-  }
-  if (!SCHOOL_CLASS_VALUES.includes(schoolClass)) {
-    return res.status(400).json({ error: "Please choose a valid class." });
-  }
-  if (!EMAIL_RE.test(email.trim())) {
-    return res.status(400).json({ error: "Enter a valid email address." });
-  }
-  if (password.length < 6) {
-    return res.status(400).json({ error: "Password must be at least 6 characters." });
-  }
-  const normalizedEmail = email.trim().toLowerCase();
+  const { errors, data } = validate(req.body, {
+    fullName:   { type: "string", required: true, min: 2, max: 150, label: "Full name" },
+    email:      { type: "email", required: true, max: 150, label: "Email" },
+    password:   { type: "string", required: true, min: 6, max: 128, label: "Password" },
+    schoolClass:{ type: "enum", required: true, values: SCHOOL_CLASS_VALUES, label: "Class" },
+  });
+  if (errors.length) return res.status(400).json({ error: errors[0], errors });
+  const { fullName, email: normalizedEmail, password, schoolClass } = data;
 
   const [existing] = await pool.query("SELECT id FROM student_accounts WHERE email = ?", [normalizedEmail]);
   if (existing.length > 0) {
@@ -293,7 +281,7 @@ router.post("/student/register", async (req, res) => {
   const hash = await hashPassword(password);
   await pool.query(
     "INSERT INTO student_accounts (full_name, email, password_hash, school_class, status) VALUES (?, ?, ?, ?, ?)",
-    [fullName.trim(), normalizedEmail, hash, schoolClass, autoActivate ? "active" : "deactivated"]
+    [fullName, normalizedEmail, hash, schoolClass, autoActivate ? "active" : "deactivated"]
   );
 
   res.status(201).json({
@@ -352,7 +340,7 @@ router.put("/student/profile", requireStudent, async (req, res) => {
 
   if (email !== undefined) {
     const normalizedEmail = email.trim().toLowerCase();
-    if (!EMAIL_RE.test(normalizedEmail)) {
+    if (!isEmail(normalizedEmail)) {
       return res.status(400).json({ error: "Enter a valid email address." });
     }
     const [existing] = await pool.query(
@@ -408,7 +396,7 @@ router.put("/teacher/profile", requireTeacher, async (req, res) => {
 
   if (email !== undefined) {
     const normalizedEmail = email.trim().toLowerCase();
-    if (!EMAIL_RE.test(normalizedEmail)) {
+    if (!isEmail(normalizedEmail)) {
       return res.status(400).json({ error: "Enter a valid email address." });
     }
     const [existing] = await pool.query(

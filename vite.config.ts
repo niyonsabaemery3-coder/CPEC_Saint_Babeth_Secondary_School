@@ -22,7 +22,7 @@ function cspPlugin(apiTarget: string, isProd: boolean): Plugin {
         // React sets many inline style="" attributes; style-src covers those too,
         // so 'unsafe-inline' is required here. This does not permit script execution.
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
-        "font-src 'self' https://fonts.gstatic.com data:",
+        "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:",
         `img-src ${imgSrc}`,
         `connect-src ${connectSrc}`,
         "object-src 'none'",

@@ -1,8 +1,17 @@
 const express = require("express");
 const pool = require("../db");
 const { requireAdmin } = require("../middleware/auth");
+const { validate } = require("../utils/validate");
 
 const router = express.Router();
+
+// Column sizes mirror the contact_messages table (see runContactMessagesMigration
+// in server/src/index.js).
+const CONTACT_SCHEMA = {
+  name:    { type: "string", required: true, min: 2, max: 150, label: "Full name" },
+  contact: { type: "contact", required: true, max: 200, label: "Email or phone number" },
+  message: { type: "string", required: true, min: 5, max: 5000, label: "Message" },
+};
 
 function toPublic(row) {
   return {
@@ -16,25 +25,20 @@ function toPublic(row) {
 }
 
 // Public: submit a contact message from the website contact form.
-router.post("/", async (req, res) => {
-  const b = req.body || {};
-  const name = (b.name || "").trim();
-  const contact = (b.contact || "").trim();
-  const message = (b.message || "").trim();
+router.post("/", async (req, res, next) => {
+  try {
+    const { errors, data: b } = validate(req.body, CONTACT_SCHEMA);
+    if (errors.length) {
+      return res.status(400).json({ error: errors[0], errors });
+    }
 
-  if (!name || name.length < 2)
-    return res.status(400).json({ error: "Full name must be at least 2 characters." });
-  if (!contact)
-    return res.status(400).json({ error: "Email or phone number is required." });
-  if (!message || message.length < 5)
-    return res.status(400).json({ error: "Message must be at least 5 characters." });
-
-  const [{ insertId }] = await pool.query(
-    "INSERT INTO contact_messages (name, contact, message) VALUES (?, ?, ?)",
-    [name, contact, message]
-  );
-  const [[row]] = await pool.query("SELECT * FROM contact_messages WHERE id = ?", [insertId]);
-  res.status(201).json(toPublic(row));
+    const [{ insertId }] = await pool.query(
+      "INSERT INTO contact_messages (name, contact, message) VALUES (?, ?, ?)",
+      [b.name, b.contact, b.message]
+    );
+    const [[row]] = await pool.query("SELECT * FROM contact_messages WHERE id = ?", [insertId]);
+    res.status(201).json(toPublic(row));
+  } catch (err) { next(err); }
 });
 
 // Admin: list all messages, newest first. Optional ?unread=1 to filter unread only.

@@ -77,7 +77,7 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "data:"],
         imgSrc: ["'self'", "data:", "blob:", supabaseOrigin],
         connectSrc: ["'self'", supabaseOrigin],
         objectSrc: ["'none'"],

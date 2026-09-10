@@ -22,9 +22,24 @@ if (!SECRET) {
 }
 const EFFECTIVE_SECRET = SECRET || "dev_secret_change_me";
 
-function signToken(payload) {
-  // payload: { role: 'admin' | 'teacher', id, ...extra }
-  return jwt.sign(payload, EFFECTIVE_SECRET, { expiresIn: "30d" });
+// Session lifetime, tuned per role by risk: admin has full write access to
+// every account/record in the system, so its token should expire soonest;
+// teachers can enter marks and manage their own resources; students/parents
+// only read their own data, so a longer session is a reasonable trade-off
+// for convenience. There is no refresh-token flow — expiry simply forces a
+// fresh login with the account's normal password, which is the correct
+// behavior for a stateless JWT with no server-side revocation list.
+const TOKEN_LIFETIME_BY_ROLE = {
+  admin: "12h",
+  teacher: "3d",
+  student: "14d",
+};
+const DEFAULT_TOKEN_LIFETIME = "3d";
+
+function signToken(payload, options = {}) {
+  // payload: { role: 'admin' | 'teacher' | 'student', id, ...extra }
+  const expiresIn = options.expiresIn || TOKEN_LIFETIME_BY_ROLE[payload?.role] || DEFAULT_TOKEN_LIFETIME;
+  return jwt.sign(payload, EFFECTIVE_SECRET, { expiresIn });
 }
 
 function readToken(req) {

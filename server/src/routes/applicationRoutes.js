@@ -3,8 +3,31 @@ const pool = require("../db");
 const { requireAdmin } = require("../middleware/auth");
 const { saveBase64File, deleteUploadedFile, resolveFileUrl } = require("../utils/uploads");
 const { logAction } = require("../utils/audit");
+const { validate } = require("../utils/validate");
 
 const router = express.Router();
+
+// Column sizes mirror stbabeth_tss.sql / the runApplicationsTableEnsureColumns
+// migration in index.js — kept here so a bad request is rejected with a
+// clear 400 message instead of failing at the database with a generic,
+// unhelpful 500 (or silently truncating on non-strict MySQL configurations).
+const APPLICATION_SCHEMA = {
+  name:          { type: "string", required: true, max: 150, label: "Student name" },
+  dob:           { type: "date", max: 30, label: "Date of birth" },
+  gender:        { type: "enum", values: ["Male", "Female"], max: 20, label: "Gender" },
+  trackyear:     { type: "string", max: 50, label: "Track/year" },
+  admissionType: { type: "enum", values: ["new_student", "transfer", "short_course"], max: 30, label: "Admission type" },
+  indexNumber:   { type: "string", max: 80, label: "Index number" },
+  currentLevel:  { type: "string", max: 50, label: "Current level" },
+  currentSchool: { type: "string", max: 200, label: "Current school" },
+  prevschool:    { type: "string", max: 200, label: "Previous school" },
+  district:      { type: "string", max: 100, label: "District" },
+  sector:        { type: "string", max: 100, label: "Sector" },
+  parent:        { type: "string", required: true, max: 150, label: "Parent/guardian name" },
+  email:         { type: "email", max: 180, label: "Parent/guardian email" },
+  phone1:        { type: "rwandaPhone", required: true, max: 30, label: "Phone number" },
+  phone2:        { type: "rwandaPhone", max: 30, label: "Second phone number" },
+};
 
 function actorName(auth) {
   return auth.username || auth.email || null;
@@ -49,35 +72,36 @@ async function toPublic(req, row) {
 // Public: submit a new application from the Apply wizard.
 router.post("/", async (req, res, next) => {
   try {
-    const b = req.body || {};
-    if (!b.name?.trim() || !b.parent?.trim() || !b.phone1?.trim()) {
-      return res.status(400).json({ error: "Student name, parent name and phone number are required." });
+    const { errors, data: b } = validate(req.body, APPLICATION_SCHEMA);
+    if (errors.length) {
+      return res.status(400).json({ error: errors[0], errors });
     }
 
-    const reportUrl = b.reportData ? await saveBase64File(b.reportData, "reports", b.report) : null;
+    const reportUrl = req.body?.reportData ? await saveBase64File(req.body.reportData, "reports", req.body.report) : null;
     const [[templates]] = await pool.query("SELECT pending_message FROM application_feedback_templates WHERE id = 1");
 
     const [{ insertId }] = await pool.query(
       `INSERT INTO applications
-        (student_name, dob, gender, track_year, admission_type, index_number, current_level, prev_school, district, sector, parent_name, parent_email, phone1, phone2, report_file_url, report_file_name, status, feedback)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+        (student_name, dob, gender, track_year, admission_type, index_number, current_level, current_school, prev_school, district, sector, parent_name, parent_email, phone1, phone2, report_file_url, report_file_name, status, feedback)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
       [
-        b.name.trim(),
-        b.dob || null,
-        b.gender || null,
-        b.trackyear || null,
-        b.admissionType || null,
-        b.indexNumber || null,
-        b.currentLevel || null,
-        b.prevschool || null,
-        b.district || null,
-        b.sector || null,
-        b.parent.trim(),
-        b.email?.trim() || null,
-        b.phone1.trim(),
-        b.phone2 || null,
+        b.name,
+        b.dob,
+        b.gender,
+        b.trackyear,
+        b.admissionType,
+        b.indexNumber,
+        b.currentLevel,
+        b.currentSchool,
+        b.prevschool,
+        b.district,
+        b.sector,
+        b.parent,
+        b.email,
+        b.phone1,
+        b.phone2,
         reportUrl,
-        reportUrl ? b.report || null : null,
+        reportUrl ? req.body.report || null : null,
         templates?.pending_message || "Your admission request has been received and is waiting for review.",
       ]
     );

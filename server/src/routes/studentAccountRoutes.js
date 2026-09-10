@@ -4,6 +4,7 @@ const { requireAdmin } = require("../middleware/auth");
 const { SCHOOL_CLASS_VALUES } = require("../constants/academics");
 const { hashPassword } = require("../utils/password");
 const { logAction } = require("../utils/audit");
+const { validate } = require("../utils/validate");
 
 const router = express.Router();
 
@@ -54,17 +55,14 @@ router.get("/", requireAdmin, async (req, res) => {
 
 // Admin: create a new student account directly (active from the start).
 router.post("/", requireAdmin, async (req, res) => {
-  const { fullName, email, password, schoolClass } = req.body || {};
-  if (!fullName?.trim() || !email?.trim() || !password || !schoolClass) {
-    return res.status(400).json({ error: "Please fill in all fields." });
-  }
-  if (!SCHOOL_CLASS_VALUES.includes(schoolClass)) {
-    return res.status(400).json({ error: "Please choose a valid class." });
-  }
-  if (password.length < 6) {
-    return res.status(400).json({ error: "Password must be at least 6 characters." });
-  }
-  const normalizedEmail = email.trim().toLowerCase();
+  const { errors, data } = validate(req.body, {
+    fullName:    { type: "string", required: true, min: 2, max: 150, label: "Full name" },
+    email:       { type: "email", required: true, max: 150, label: "Email" },
+    password:    { type: "string", required: true, min: 6, max: 128, label: "Password" },
+    schoolClass: { type: "enum", required: true, values: SCHOOL_CLASS_VALUES, label: "Class" },
+  });
+  if (errors.length) return res.status(400).json({ error: errors[0], errors });
+  const { fullName, email: normalizedEmail, password, schoolClass } = data;
 
   const [existing] = await pool.query("SELECT id FROM student_accounts WHERE email = ?", [normalizedEmail]);
   if (existing.length > 0) {
@@ -74,7 +72,7 @@ router.post("/", requireAdmin, async (req, res) => {
   const hash = await hashPassword(password);
   const [{ insertId }] = await pool.query(
     "INSERT INTO student_accounts (full_name, email, password_hash, school_class, status) VALUES (?, ?, ?, ?, 'active')",
-    [fullName.trim(), normalizedEmail, hash, schoolClass]
+    [fullName, normalizedEmail, hash, schoolClass]
   );
 
   const [rows] = await pool.query("SELECT * FROM student_accounts WHERE id = ?", [insertId]);
@@ -86,7 +84,7 @@ router.post("/", requireAdmin, async (req, res) => {
     action: "create",
     entityType: "student_account",
     entityId: insertId,
-    details: { fullName: fullName.trim(), email: normalizedEmail, schoolClass },
+    details: { fullName, email: normalizedEmail, schoolClass },
   });
 
   res.status(201).json(toPublic(rows[0]));
